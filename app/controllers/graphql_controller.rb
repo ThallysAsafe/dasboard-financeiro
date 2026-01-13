@@ -1,19 +1,20 @@
 # frozen_string_literal: true
 
 class GraphqlController < ApplicationController
-  # If accessing from outside this domain, nullify the session
-  # This allows for outside API access while preventing CSRF attacks,
-  # but you'll have to authenticate your user separately
-  # protect_from_forgery with: :null_session
+  # Se estiver acessando de fora do domínio, nullify a session
+  # Isso permite acesso externo à API e previne ataques CSRF
+  skip_before_action :verify_authenticity_token
 
   def execute
     variables = prepare_variables(params[:variables])
     query = params[:query]
     operation_name = params[:operationName]
+    
+    # Contexto do GraphQL com usuário autenticado via JWT
     context = {
-      # Query context goes here, for example:
-      # current_user: current_user,
+      current_user: current_user,
     }
+    
     result = AppSchema.execute(query, variables: variables, context: context, operation_name: operation_name)
     render json: result
   rescue StandardError => e
@@ -22,6 +23,31 @@ class GraphqlController < ApplicationController
   end
 
   private
+
+  # Retorna o usuário autenticado a partir do token JWT
+  # Se não houver token ou for inválido, retorna nil (GraphQL permitirá queries públicas)
+  def current_user
+    @current_user ||= find_user_from_token
+  end
+
+  # Extrai o token do header Authorization
+  # Formato esperado: "Authorization: Bearer <token>"
+  def token_from_request_headers
+    request.headers['Authorization']&.split(' ')&.last
+  end
+
+  # Busca o usuário a partir do token JWT
+  def find_user_from_token
+    token = token_from_request_headers
+    return nil unless token
+
+    decoded_token = JsonWebToken.decode(token)
+    return nil unless decoded_token
+
+    User.find_by(id: decoded_token[:user_id])
+  rescue ActiveRecord::RecordNotFound
+    nil
+  end
 
   # Handle variables in form data, JSON body, or a blank value
   def prepare_variables(variables_param)
