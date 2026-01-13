@@ -11,20 +11,21 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
   app:
-    build: .
-    command: bash -c "rm -f tmp/pids/server.pid && bundle exec rails s -p 3000 -b '0.0.0.0'"
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     volumes:
       - .:/rails
+      - bundle_cache:/usr/local/bundle
     ports:
       - "3000:3000"
     depends_on:
       - db
     environment:
       DATABASE_HOST: db
-      # Também lê as variáveis do .env para o Rails
       DATABASE_USER: ${POSTGRES_USER}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
-      RAILS_ENV: development
 
 volumes:
   postgres_data:
+  bundle_cache:
