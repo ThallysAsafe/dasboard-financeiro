@@ -1,4 +1,4 @@
-class UserCreate < GraphQL::Schema::Mutation
+class Mutations::User::UserCreate < GraphQL::Schema::Mutation
   argument :email, String, required: true
   argument :password, String, required: true
 
