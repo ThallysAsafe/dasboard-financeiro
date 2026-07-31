@@ -102,6 +102,11 @@
             border: 1px solid rgba(148, 163, 184, 0.1);
             border-radius: 16px;
             padding: 24px;
+            transition: transform 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
         }
 
         .card h3 {
@@ -112,9 +117,21 @@
         }
 
         .card .value {
-            font-size: 24px;
+            font-size: 28px;
             font-weight: 700;
             color: #f8fafc;
+        }
+
+        .card.balance .value {
+            color: #60a5fa;
+        }
+
+        .card.income .value {
+            color: #4ade80;
+        }
+
+        .card.expense .value {
+            color: #f87171;
         }
     </style>
 </head>
@@ -130,33 +147,33 @@
     <main class="main-content">
         <div class="dashboard-header">
             <h1>Painel Principal</h1>
-            <p>Bem-vindo ao seu painel financeiro.</p>
+            <p>Resumo financeiro carregado em tempo real via GraphQL.</p>
         </div>
 
         <div class="card-grid">
-            <div class="card">
-                <h3>Status da Autenticação</h3>
-                <div class="value" style="color: #4ade80;">Autenticado com JWT</div>
+            <div class="card balance">
+                <h3>Saldo Atual</h3>
+                <div id="balanceValue" class="value">R$ --</div>
             </div>
-            <div class="card">
-                <h3>Saldo Total</h3>
-                <div class="value">R$ 0,00</div>
+
+            <div class="card income">
+                <h3>Receitas Totais</h3>
+                <div id="incomeValue" class="value">R$ --</div>
             </div>
-            <div class="card">
-                <h3>Receitas do Mês</h3>
-                <div class="value">R$ 0,00</div>
+
+            <div class="card expense">
+                <h3>Despesas Totais</h3>
+                <div id="expenseValue" class="value">R$ --</div>
             </div>
         </div>
     </main>
 
     <script>
-        // Verificar se está autenticado ao carregar a página
         document.addEventListener('DOMContentLoaded', () => {
             const token = localStorage.getItem('token');
             const userJson = localStorage.getItem('user');
 
             if (!token) {
-                // Redireciona para o login se não houver token
                 window.location.href = '/login';
                 return;
             }
@@ -169,7 +186,54 @@
                     document.getElementById('userEmailDisplay').textContent = 'Usuário Autenticado';
                 }
             }
+
+            // Buscar métricas financeiras no GraphQL
+            loadFinancialData(token);
         });
+
+        async function loadFinancialData(token) {
+            const query = `
+                query GetFinancialMetrics {
+                    balance
+                    totalIncome
+                    totalExpense
+                }
+            `;
+
+            try {
+                const response = await fetch('/graphql', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ query })
+                });
+
+                const result = await response.json();
+
+                if (result.errors && result.errors.length > 0) {
+                    console.error('Erros GraphQL:', result.errors);
+                    if (result.errors.some(err => err.message.includes('autenticado'))) {
+                        handleLogout();
+                    }
+                    return;
+                }
+
+                if (result.data) {
+                    const { balance, totalIncome, totalExpense } = result.data;
+                    document.getElementById('balanceValue').textContent = formatCurrency(balance);
+                    document.getElementById('incomeValue').textContent = formatCurrency(totalIncome);
+                    document.getElementById('expenseValue').textContent = formatCurrency(totalExpense);
+                }
+            } catch (error) {
+                console.error('Erro na requisição GraphQL:', error);
+            }
+        }
+
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+        }
 
         function handleLogout() {
             localStorage.removeItem('token');

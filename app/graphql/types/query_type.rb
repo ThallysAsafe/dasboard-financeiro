@@ -2,63 +2,85 @@
 
 module Types
   class QueryType < Types::BaseObject
-    field :node, Types::NodeType, null: true, description: "Fetches an object given its ID." do
-      argument :id, ID, required: true, description: "ID of the object."
-    end
-
-    def node(id:)
-      context.schema.object_from_id(id, context)
-    end
-
-    field :nodes, [Types::NodeType, null: true], null: true, description: "Fetches a list of objects given a list of IDs." do
-      argument :ids, [ID], required: true, description: "IDs of the objects."
-    end
-
-    def nodes(ids:)
-      ids.map { |id| context.schema.object_from_id(id, context) }
-    end
-
-    # Add root-level fields here.
-    # They will be entry points for queries on your schema.
-
     # Query: Perfil do usuário autenticado
-    # Requer autenticação JWT
     field :me, Types::UserType, null: true, description: "Retorna o perfil do usuário autenticado"
-    
     def me
-      # context[:current_user] foi definido no GraphqlController
       context[:current_user]
     end
 
-    # Query: Listar todos os usuários
-    # Requer autenticação JWT
-    field :users, [Types::UserType], null: false, description: "Lista todos os usuários (requer autenticação)"
-    
+    # Query: Listar usuários
+    field :users, [Types::UserType], null: false, description: "Lista todos os usuários"
     def users
-      raise GraphQL::ExecutionError, "Você precisa estar autenticado" unless context[:current_user]
-      
+      require_user!
       User.all
     end
 
-    # Query: Buscar um usuário por ID
-    # Requer autenticação JWT
-    field :user, Types::UserType, null: true, description: "Busca um usuário por ID (requer autenticação)" do
+    field :user, Types::UserType, null: true, description: "Busca um usuário por ID" do
       argument :id, ID, required: true
     end
-    
     def user(id:)
-      raise GraphQL::ExecutionError, "Você precisa estar autenticado" unless context[:current_user]
-      
+      require_user!
       User.find(id)
     rescue ActiveRecord::RecordNotFound
       raise GraphQL::ExecutionError, "Usuário não encontrado"
     end
 
-    # TODO: remove me
-    field :test_field, String, null: false,
-      description: "An example field added by the generator"
-    def test_field
-      "Hello World!"
+    # --- QUERIES DE RECEITAS (INCOMES) ---
+    field :incomes, [Types::IncomeType], null: false, description: "Lista todas as receitas do usuário autenticado"
+    def incomes
+      require_user!
+      context[:current_user].incomes.order(date: :desc)
+    end
+
+    field :income, Types::IncomeType, null: true, description: "Busca uma receita do usuário autenticado por ID" do
+      argument :id, ID, required: true
+    end
+    def income(id:)
+      require_user!
+      context[:current_user].incomes.find(id)
+    rescue ActiveRecord::RecordNotFound
+      raise GraphQL::ExecutionError, "Receita não encontrada"
+    end
+
+    # --- QUERIES DE DESPESAS (EXPENSES) ---
+    field :expenses, [Types::ExpenseType], null: false, description: "Lista todas as despesas do usuário autenticado"
+    def expenses
+      require_user!
+      context[:current_user].expenses.order(date: :desc)
+    end
+
+    field :expense, Types::ExpenseType, null: true, description: "Busca uma despesa do usuário autenticado por ID" do
+      argument :id, ID, required: true
+    end
+    def expense(id:)
+      require_user!
+      context[:current_user].expenses.find(id)
+    rescue ActiveRecord::RecordNotFound
+      raise GraphQL::ExecutionError, "Despesa não encontrada"
+    end
+
+    # --- RESUMO FINANCEIRO ---
+    field :total_income, Float, null: false, description: "Soma total das receitas do usuário"
+    def total_income
+      require_user!
+      context[:current_user].incomes.sum(:amount).to_f
+    end
+
+    field :total_expense, Float, null: false, description: "Soma total das despesas do usuário"
+    def total_expense
+      require_user!
+      context[:current_user].expenses.sum(:amount).to_f
+    end
+
+    field :balance, Float, null: false, description: "Saldo total (Receitas - Despesas) do usuário"
+    def balance
+      total_income - total_expense
+    end
+
+    private
+
+    def require_user!
+      raise GraphQL::ExecutionError, "Você precisa estar autenticado" unless context[:current_user]
     end
   end
 end
