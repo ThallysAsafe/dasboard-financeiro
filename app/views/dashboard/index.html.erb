@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Dashboard Financeiro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .navbar {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar-brand {
+            font-size: 20px;
+            font-weight: 700;
+            color: #60a5fa;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .user-email {
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        .btn-logout {
+            padding: 8px 16px;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-logout:hover {
+            background: rgba(239, 68, 68, 0.25);
+            color: #ffffff;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 40px 32px;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .dashboard-header {
+            margin-bottom: 32px;
+        }
+
+        .dashboard-header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .dashboard-header p {
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .card h3 {
+            font-size: 14px;
+            font-weight: 500;
+            color: #94a3b8;
+            margin-bottom: 12px;
+        }
+
+        .card .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #f8fafc;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand">Dashboard Financeiro</div>
+        <div class="user-info">
+            <span id="userEmailDisplay" class="user-email">Carregando...</span>
+            <button onclick="handleLogout()" class="btn-logout">Sair</button>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="dashboard-header">
+            <h1>Painel Principal</h1>
+            <p>Bem-vindo ao seu painel financeiro.</p>
+        </div>
+
+        <div class="card-grid">
+            <div class="card">
+                <h3>Status da Autenticação</h3>
+                <div class="value" style="color: #4ade80;">Autenticado com JWT</div>
+            </div>
+            <div class="card">
+                <h3>Saldo Total</h3>
+                <div class="value">R$ 0,00</div>
+            </div>
+            <div class="card">
+                <h3>Receitas do Mês</h3>
+                <div class="value">R$ 0,00</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Verificar se está autenticado ao carregar a página
+        document.addEventListener('DOMContentLoaded', () => {
+            const token = localStorage.getItem('token');
+            const userJson = localStorage.getItem('user');
+
+            if (!token) {
+                // Redireciona para o login se não houver token
+                window.location.href = '/login';
+                return;
+            }
+
+            if (userJson) {
+                try {
+                    const user = JSON.parse(userJson);
+                    document.getElementById('userEmailDisplay').textContent = user.email || 'Usuário Autenticado';
+                } catch (e) {
+                    document.getElementById('userEmailDisplay').textContent = 'Usuário Autenticado';
+                }
+            }
+        });
+
+        function handleLogout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+    </script>
+</body>
+</html>

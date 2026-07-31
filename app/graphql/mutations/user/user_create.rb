@@ -6,9 +6,6 @@ class Mutations::User::UserCreate < GraphQL::Schema::Mutation
   field :errors, [String], null: false
 
   def resolve(email:, password:)
-    # Validar se o usuário está autenticado
-    raise GraphQL::ExecutionError, "Você precisa estar autenticado" unless context[:current_user]
-    
     user = User.new(email: email, password: password)
     if user.save
       { user: user, errors: [] }
