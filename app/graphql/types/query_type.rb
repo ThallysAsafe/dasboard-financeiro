@@ -25,6 +25,23 @@ module Types
       raise GraphQL::ExecutionError, "Usuário não encontrado"
     end
 
+    # --- QUERIES DE CARTEIRAS (WALLETS) ---
+    field :wallets, [Types::WalletType], null: false, description: "Lista todas as carteiras do usuário autenticado"
+    def wallets
+      require_user!
+      context[:current_user].wallets.order(created_at: :asc)
+    end
+
+    field :wallet, Types::WalletType, null: true, description: "Busca uma carteira do usuário autenticado por ID" do
+      argument :id, ID, required: true
+    end
+    def wallet(id:)
+      require_user!
+      context[:current_user].wallets.find(id)
+    rescue ActiveRecord::RecordNotFound
+      raise GraphQL::ExecutionError, "Carteira não encontrada"
+    end
+
     # --- QUERIES DE RECEITAS (INCOMES) ---
     field :incomes, [Types::IncomeType], null: false, description: "Lista todas as receitas do usuário autenticado"
     def incomes
@@ -59,22 +76,23 @@ module Types
       raise GraphQL::ExecutionError, "Despesa não encontrada"
     end
 
-    # --- RESUMO FINANCEIRO ---
-    field :total_income, Float, null: false, description: "Soma total das receitas do usuário"
+    # --- RESUMO FINANCEIRO GERAL ---
+    field :total_income, Float, null: false, description: "Soma total de todas as receitas do usuário"
     def total_income
       require_user!
       context[:current_user].incomes.sum(:amount).to_f
     end
 
-    field :total_expense, Float, null: false, description: "Soma total das despesas do usuário"
+    field :total_expense, Float, null: false, description: "Soma total de todas as despesas do usuário"
     def total_expense
       require_user!
       context[:current_user].expenses.sum(:amount).to_f
     end
 
-    field :balance, Float, null: false, description: "Saldo total (Receitas - Despesas) do usuário"
+    field :balance, Float, null: false, description: "Saldo total geral (Saldo das carteiras + Receitas - Despesas)"
     def balance
-      total_income - total_expense
+      require_user!
+      context[:current_user].wallets.sum(&:balance)
     end
 
     private

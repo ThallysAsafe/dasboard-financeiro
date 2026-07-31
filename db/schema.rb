@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_07_31_014049) do
+ActiveRecord::Schema[7.2].define(version: 2026_07_31_112357) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -22,7 +22,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_31_014049) do
     t.bigint "user_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "wallet_id"
     t.index ["user_id"], name: "index_expenses_on_user_id"
+    t.index ["wallet_id"], name: "index_expenses_on_wallet_id"
   end
 
   create_table "incomes", force: :cascade do |t|
@@ -33,7 +35,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_31_014049) do
     t.bigint "user_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "wallet_id"
     t.index ["user_id"], name: "index_incomes_on_user_id"
+    t.index ["wallet_id"], name: "index_incomes_on_wallet_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -44,6 +48,18 @@ ActiveRecord::Schema[7.2].define(version: 2026_07_31_014049) do
     t.index ["email"], name: "index_users_on_email"
   end
 
+  create_table "wallets", force: :cascade do |t|
+    t.string "name", null: false
+    t.decimal "initial_balance", precision: 10, scale: 2, default: "0.0", null: false
+    t.bigint "user_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_wallets_on_user_id"
+  end
+
   add_foreign_key "expenses", "users"
+  add_foreign_key "expenses", "wallets"
   add_foreign_key "incomes", "users"
+  add_foreign_key "incomes", "wallets"
+  add_foreign_key "wallets", "users"
 end

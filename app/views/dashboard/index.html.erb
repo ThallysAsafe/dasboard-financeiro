@@ -90,11 +90,19 @@
             font-size: 14px;
         }
 
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-top: 40px;
+            margin-bottom: 16px;
+            color: #e2e8f0;
+        }
+
         .card-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 24px;
-            margin-top: 24px;
+            margin-top: 16px;
         }
 
         .card {
@@ -133,6 +141,24 @@
         .card.expense .value {
             color: #f87171;
         }
+
+        .wallet-card {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .wallet-card .wallet-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f8fafc;
+            margin-bottom: 8px;
+        }
+
+        .wallet-card .wallet-balance {
+            font-size: 22px;
+            font-weight: 700;
+            color: #38bdf8;
+        }
     </style>
 </head>
 <body>
@@ -147,12 +173,12 @@
     <main class="main-content">
         <div class="dashboard-header">
             <h1>Painel Principal</h1>
-            <p>Resumo financeiro carregado em tempo real via GraphQL.</p>
+            <p>Resumo financeiro e carteiras carregadas em tempo real via GraphQL.</p>
         </div>
 
         <div class="card-grid">
             <div class="card balance">
-                <h3>Saldo Atual</h3>
+                <h3>Saldo Geral Total</h3>
                 <div id="balanceValue" class="value">R$ --</div>
             </div>
 
@@ -164,6 +190,14 @@
             <div class="card expense">
                 <h3>Despesas Totais</h3>
                 <div id="expenseValue" class="value">R$ --</div>
+            </div>
+        </div>
+
+        <h2 class="section-title">Minhas Carteiras</h2>
+        <div id="walletsGrid" class="card-grid">
+            <div class="card wallet-card">
+                <div class="wallet-name">Nenhuma carteira cadastrada</div>
+                <div class="wallet-balance">R$ 0,00</div>
             </div>
         </div>
     </main>
@@ -187,7 +221,6 @@
                 }
             }
 
-            // Buscar métricas financeiras no GraphQL
             loadFinancialData(token);
         });
 
@@ -197,6 +230,13 @@
                     balance
                     totalIncome
                     totalExpense
+                    wallets {
+                        id
+                        name
+                        balance
+                        totalIncome
+                        totalExpense
+                    }
                 }
             `;
 
@@ -221,18 +261,47 @@
                 }
 
                 if (result.data) {
-                    const { balance, totalIncome, totalExpense } = result.data;
+                    const { balance, totalIncome, totalExpense, wallets } = result.data;
                     document.getElementById('balanceValue').textContent = formatCurrency(balance);
                     document.getElementById('incomeValue').textContent = formatCurrency(totalIncome);
                     document.getElementById('expenseValue').textContent = formatCurrency(totalExpense);
+
+                    renderWallets(wallets || []);
                 }
             } catch (error) {
                 console.error('Erro na requisição GraphQL:', error);
             }
         }
 
+        function renderWallets(wallets) {
+            const grid = document.getElementById('walletsGrid');
+            if (!wallets || wallets.length === 0) {
+                grid.innerHTML = `
+                    <div class="card wallet-card">
+                        <div class="wallet-name">Nenhuma carteira cadastrada</div>
+                        <div class="wallet-balance">R$ 0,00</div>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = wallets.map(wallet => `
+                <div class="card wallet-card">
+                    <div class="wallet-name">${escapeHtml(wallet.name)}</div>
+                    <div class="wallet-balance">${formatCurrency(wallet.balance)}</div>
+                    <div style="font-size: 12px; color: #94a3b8; margin-top: 8px;">
+                        + ${formatCurrency(wallet.totalIncome)} | - ${formatCurrency(wallet.totalExpense)}
+                    </div>
+                </div>
+            `).join('');
+        }
+
         function formatCurrency(value) {
             return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+        }
+
+        function escapeHtml(str) {
+            return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
 
         function handleLogout() {
