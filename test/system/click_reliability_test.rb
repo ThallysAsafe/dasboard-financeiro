@@ -63,6 +63,39 @@ class ClickReliabilityTest < ApplicationSystemTestCase
     assert_equal 1, users(:one).transactions.expense.count
   end
 
+  # --- teclas especiais
+
+  test "a tecla Esc entregue normalmente fecha o modal" do
+    first("[data-action='open-create'][data-kind='income']").click
+    assert_selector "#entryModal.open"
+
+    find("body").send_keys(:escape)
+
+    assert_no_selector "#entryModal.open"
+  end
+
+  test "a tecla Esc que o navegador perdeu é refeita por JavaScript e fecha o modal" do
+    first("[data-action='open-create'][data-kind='income']").click
+    assert_selector "#entryModal.open"
+    corpo = find("body")
+    antes = ApplicationSystemTestCase.js_fallbacks[:tecla]
+
+    corpo.native.stub(:send_keys, nil) { corpo.send_keys(:escape) } # o "navegador" perde a tecla
+
+    assert_no_selector "#entryModal.open"
+    assert_operator ApplicationSystemTestCase.js_fallbacks[:tecla], :>, antes
+  end
+
+  test "uma tecla que não é especial não passa pela recuperação" do
+    first("[data-action='open-create'][data-kind='income']").click
+    assert_selector "#entryModal.open"
+    antes = ApplicationSystemTestCase.js_fallbacks[:tecla]
+
+    find("#entryDescription").send_keys("a")
+
+    assert_equal antes, ApplicationSystemTestCase.js_fallbacks[:tecla]
+  end
+
   test "clique que navega a página não é refeito nem quebra" do
     click_button "Sair" # volta ao login (o setup deixou a sessão aberta)
     assert_current_path "/login"
