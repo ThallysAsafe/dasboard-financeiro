@@ -18,7 +18,7 @@ module Mutations
         user = ::User.find_by(email: email)
 
         if user&.authenticate(password)
-          token = JsonWebToken.encode(user_id: user.id)
+          token = JsonWebToken.issue_for(user)
           { token: token, user: user, errors: [] }
         else
           { token: nil, user: nil, errors: ["Email ou senha inválidos"] }

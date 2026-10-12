@@ -33,17 +33,7 @@ module Authenticable
   # Busca o usuário a partir do token JWT
   # @return [User, nil] Usuário autenticado ou nil
   def find_user_from_token
-    token = token_from_request_headers
-    return nil unless token
-
-    # Decodifica o token
-    decoded_token = JsonWebToken.decode(token)
-    return nil unless decoded_token
-
-    # Busca o usuário pelo ID armazenado no token
-    User.find_by(id: decoded_token[:user_id])
-  rescue ActiveRecord::RecordNotFound
-    nil
+    JsonWebToken.user_for(token_from_request_headers)
   end
 
   # Retorna erro 401 (Não autorizado)

@@ -1,7 +1,13 @@
 require "test_helper"
 
 class AuthThrottleTest < ActionDispatch::IntegrationTest
-  setup { Rack::Attack.cache.store.clear }
+  # A janela do Rack::Attack é fixa (alinhada ao relógio): sem congelar o
+  # tempo, um teste que cruza a virada do minuto divide o contador e falha.
+  setup do
+    Rack::Attack.cache.store.clear
+    travel_to Time.current.beginning_of_hour + 10.seconds
+  end
+
   teardown { Rack::Attack.cache.store.clear }
 
   def login(email, password = "errada", ip: "10.0.0.1")

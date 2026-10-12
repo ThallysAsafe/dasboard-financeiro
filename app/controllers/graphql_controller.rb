@@ -37,17 +37,9 @@ class GraphqlController < ApplicationController
     request.headers['Authorization']&.split(' ')&.last
   end
 
-  # Busca o usuário a partir do token JWT
+  # Busca o usuário a partir do token JWT (nil se ausente, inválido ou revogado)
   def find_user_from_token
-    token = token_from_request_headers
-    return nil unless token
-
-    decoded_token = JsonWebToken.decode(token)
-    return nil unless decoded_token
-
-    User.find_by(id: decoded_token[:user_id])
-  rescue ActiveRecord::RecordNotFound
-    nil
+    JsonWebToken.user_for(token_from_request_headers)
   end
 
   # Handle variables in form data, JSON body, or a blank value

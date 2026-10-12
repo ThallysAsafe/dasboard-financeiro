@@ -35,7 +35,7 @@ module Api
         # Valida se o usuário existe e a senha está correta
         if user&.authenticate(params[:password])
           # Gera o token JWT com o ID do usuário
-          token = JsonWebToken.encode(user_id: user.id)
+          token = JsonWebToken.issue_for(user)
           
           render json: {
             token: token,
@@ -70,16 +70,16 @@ module Api
       end
 
       # POST /api/v1/auth/logout
-      # Logout (stateless - apenas retorna sucesso)
-      # O cliente deve descartar o token localmente
+      # Logout: revoga todos os tokens emitidos para o usuário
       # 
       # Resposta de sucesso (200):
       # {
       #   "message": "Logout realizado com sucesso"
       # }
       def logout
-        # JWT é stateless, então o logout é feito no cliente
-        # O servidor apenas confirma a operação
+        # Invalida todos os tokens do usuário incrementando a versão que eles
+        # carregam; o cliente ainda deve descartar o token localmente.
+        current_user.revoke_tokens!
         render json: { message: 'Logout realizado com sucesso' }, status: :ok
       end
     end

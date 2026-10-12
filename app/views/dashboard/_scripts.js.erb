@@ -525,7 +525,14 @@ function hideModalAlert() {
     box.className = 'alert-message';
 }
 
-function handleLogout() {
+async function handleLogout() {
+    // Revoga o token no servidor; se a chamada falhar, o logout local segue.
+    try {
+        await fetch('/api/v1/auth/logout', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+    } catch (e) { /* sem rede: ainda assim descarta o token local */ }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/login';
