@@ -21,10 +21,21 @@ services:
       - "3000:3000"
     depends_on:
       - db
+      - mailpit
     environment:
       DATABASE_HOST: db
       DATABASE_USER: ${POSTGRES_USER}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      # E-mail: em desenvolvimento tudo cai no Mailpit (nada é enviado de verdade)
+      SMTP_ADDRESS: mailpit
+      SMTP_PORT: 1025
+
+  # Caixa de entrada local para desenvolvimento: recebe os e-mails do app e mostra
+  # em http://localhost:8025. O SMTP (1025) só é acessível pela rede do compose.
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
 
 volumes:
   postgres_data:

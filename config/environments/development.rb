@@ -37,14 +37,20 @@ Rails.application.configure do
   config.web_console.permissions = "172.0.0.0/8"
 
 
-  # Don't care if the mailer can't send.
-  config.action_mailer.raise_delivery_errors = false
+  # E-mails vão por SMTP para o Mailpit (docker-compose, http://localhost:8025). Aqui
+  # uma falha de envio deve aparecer, não ser engolida.
+  config.action_mailer.raise_delivery_errors = true
+  config.action_mailer.delivery_method = :smtp
+  config.action_mailer.smtp_settings = {
+    address: ENV.fetch("SMTP_ADDRESS", "localhost"),
+    port: ENV.fetch("SMTP_PORT", 1025).to_i
+  }
 
   # Disable caching for Action Mailer templates even if Action Controller
   # caching is enabled.
   config.action_mailer.perform_caching = false
 
-  config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
+  config.action_mailer.default_url_options = { host: "localhost", port: 3000 } # base dos links nos e-mails
 
   # Print deprecation notices to the Rails logger.
   config.active_support.deprecation = :log
