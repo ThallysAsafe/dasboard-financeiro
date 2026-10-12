@@ -60,13 +60,13 @@ class SignupTest < ApplicationSystemTestCase
 
   test "depois de cadastrar, sair e entrar de novo funciona" do
     fill_signup
-    assert_current_path "/dashboard"
+    assert_dashboard_ready("novo@exemplo.com")
     click_button "Sair"
     assert_current_path "/login"
 
     fill_in "email", with: "novo@exemplo.com"
     fill_in "password", with: SENHA
     click_button "Entrar"
-    assert_current_path "/dashboard"
+    assert_dashboard_ready("novo@exemplo.com")
   end
 end

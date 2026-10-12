@@ -55,3 +55,7 @@ async function handleLogin(event) {
 }
 
 document.getElementById('loginForm').addEventListener('submit', handleLogin);
+
+// Sinal de que os handlers estão ligados; os testes de navegador esperam por ele
+// antes de clicar (o módulo é carregado de forma diferida).
+document.body.dataset.ready = 'true';

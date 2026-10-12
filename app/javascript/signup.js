@@ -57,3 +57,6 @@ async function handleSignup(event) {
 }
 
 form.addEventListener('submit', handleSignup);
+
+// Sinal de que os handlers estão ligados (ver login.js).
+document.body.dataset.ready = 'true';

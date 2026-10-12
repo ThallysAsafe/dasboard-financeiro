@@ -71,6 +71,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     await loadDashboard();
+
+    // Sinal de que os handlers estão ligados e a primeira carga terminou; os testes
+    // de navegador esperam por ele para não clicar no meio da renderização.
+    document.body.dataset.ready = 'true';
 });
 
 document.addEventListener('keydown', (event) => {
