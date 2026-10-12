@@ -15,9 +15,9 @@ module Mutations
           raise GraphQL::ExecutionError, AuthThrottle::MESSAGE
         end
 
-        user = ::User.find_by(email: email)
+        user = ::User.authenticate_with(email, password)
 
-        if user&.authenticate(password)
+        if user
           token = JsonWebToken.issue_for(user)
           { token: token, user: user, errors: [] }
         else

@@ -49,7 +49,7 @@ module RecurringSchedule
     anchor = floor if anchor < floor
 
     dates = []
-    while anchor <= limit.beginning_of_month && dates.size <= MAX_BACKFILL_MONTHS
+    while anchor <= limit.beginning_of_month
       dates << RecurringSchedule.occurrence_date(anchor, day_of_month)
       anchor = anchor.next_month
     end

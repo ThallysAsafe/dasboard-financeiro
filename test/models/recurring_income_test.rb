@@ -69,14 +69,17 @@ class RecurringIncomeTest < ActiveSupport::TestCase
     assert_equal 0, t.incomes.count
   end
 
-  test "limita a retroação de um template muito antigo" do
+  test "limita a retroação a exatamente 120 meses, mantendo os mais recentes" do
     hoje = Date.new(2026, 8, 9)
-    t = template(start_date: hoje - 30.years)
+    t = template(start_date: hoje - 30.years, day_of_month: 5)
 
     criados = t.generate_entries!(today: hoje)
 
-    assert_operator criados, :<=, RecurringSchedule::MAX_BACKFILL_MONTHS
-    assert_operator t.incomes.minimum(:date), :>=, hoje - RecurringSchedule::MAX_BACKFILL_MONTHS.months
+    assert_equal RecurringSchedule::MAX_BACKFILL_MONTHS, criados
+    # Janela fechada de 120 meses: de set/2016 a ago/2026. O corte descarta os
+    # meses antigos, nunca os recentes.
+    assert_equal Date.new(2016, 9, 5), t.incomes.minimum(:date)
+    assert_equal Date.new(2026, 8, 5), t.incomes.maximum(:date)
   end
 
   test "lançamento apagado pelo usuário não é recriado" do

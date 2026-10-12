@@ -83,4 +83,18 @@ class UserTest < ActiveSupport::TestCase
     assert user.authenticate("123456")
     assert user.update(email: "novo@exemplo.com")
   end
+
+  test "authenticate_with devolve o usuário só com e-mail e senha corretos" do
+    assert_equal users(:one), User.authenticate_with("um@exemplo.com", "123456")
+    assert_equal users(:one), User.authenticate_with("  UM@exemplo.com ", "123456")
+    assert_nil User.authenticate_with("um@exemplo.com", "errada")
+    assert_nil User.authenticate_with("naoexiste@exemplo.com", "123456")
+  end
+
+  test "authenticate_with trata e-mail ou senha vazios sem levantar erro" do
+    assert_nil User.authenticate_with("um@exemplo.com", "")
+    assert_nil User.authenticate_with("um@exemplo.com", nil)
+    assert_nil User.authenticate_with("", "123456")
+    assert_nil User.authenticate_with(nil, nil)
+  end
 end

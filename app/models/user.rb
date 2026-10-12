@@ -29,6 +29,15 @@ class User < ApplicationRecord
     increment!(:token_version)
   end
 
+  # Único caminho de login (REST e GraphQL). Devolve o usuário ou nil.
+  # authenticate_by gasta o mesmo tempo de bcrypt mesmo quando o e-mail não
+  # existe, então o tempo de resposta não revela quais e-mails estão cadastrados.
+  def self.authenticate_with(email, password)
+    return nil if email.blank? || password.blank?
+
+    authenticate_by(email: email, password: password)
+  end
+
   # Materializa os lançamentos devidos de todos os templates ativos.
   # Devolve quantos lançamentos foram criados no total.
   def sync_recurring_entries!(today: Date.current)

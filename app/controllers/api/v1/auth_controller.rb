@@ -32,10 +32,9 @@ module Api
       # Clientes que não são navegador obtêm um token Bearer pela mutation
       # GraphQL `userLogin`.
       def login
-        user = User.find_by(email: params[:email])
+        user = User.authenticate_with(params[:email], params[:password])
 
-        # Valida se o usuário existe e a senha está correta
-        if user&.authenticate(params[:password])
+        if user
           set_auth_cookie(user)
 
           render json: {

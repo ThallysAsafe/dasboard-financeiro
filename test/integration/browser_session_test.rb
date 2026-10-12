@@ -37,6 +37,30 @@ class BrowserSessionTest < ActionDispatch::IntegrationTest
     assert_nil response.headers["Set-Cookie"]
   end
 
+  test "login sem senha ou sem e-mail é 401, não erro 500" do
+    post "/api/v1/auth/login", params: { email: "um@exemplo.com" }
+    assert_response :unauthorized
+
+    post "/api/v1/auth/login", params: {}
+    assert_response :unauthorized
+  end
+
+  test "login GraphQL e REST respondem igual a credenciais inválidas" do
+    post "/graphql", params: { query: 'mutation { userLogin(email: "um@exemplo.com", password: "errada") { token errors } }' }, as: :json
+    payload = response.parsed_body.dig("data", "userLogin")
+
+    assert_nil payload["token"]
+    assert_equal [ "Email ou senha inválidos" ], payload["errors"]
+  end
+
+  test "login GraphQL válido devolve um token Bearer utilizável" do
+    post "/graphql", params: { query: 'mutation { userLogin(email: "UM@exemplo.com", password: "123456") { token } }' }, as: :json
+    token = response.parsed_body.dig("data", "userLogin", "token")
+
+    get "/api/v1/auth/me", headers: { "Authorization" => "Bearer #{token}" }
+    assert_response :ok
+  end
+
   test "o cookie autentica a API quando a requisição leva X-Requested-With" do
     login
 
