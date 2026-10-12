@@ -1,6 +1,8 @@
 require "test_helper"
 
 class UserTest < ActiveSupport::TestCase
+  include ActionMailer::TestHelper
+
   test "sync_recurring_entries! soma receitas e despesas e é idempotente" do
     user = users(:one)
     user.recurring_transactions.create!(
@@ -96,5 +98,119 @@ class UserTest < ActiveSupport::TestCase
     assert_nil User.authenticate_with("um@exemplo.com", nil)
     assert_nil User.authenticate_with("", "123456")
     assert_nil User.authenticate_with(nil, nil)
+  end
+
+  # --- token de redefinição de senha
+
+  test "o token de redefinição encontra o usuário" do
+    token = users(:one).generate_token_for(:password_reset)
+
+    assert_equal users(:one), User.find_by_token_for(:password_reset, token)
+  end
+
+  test "o token de redefinição expira em 30 minutos" do
+    token = users(:one).generate_token_for(:password_reset)
+
+    travel 29.minutes do
+      assert_equal users(:one), User.find_by_token_for(:password_reset, token)
+    end
+    travel 31.minutes do
+      assert_nil User.find_by_token_for(:password_reset, token)
+    end
+  end
+
+  test "o token de redefinição vale uma vez só: trocar a senha o invalida" do
+    user = User.find(users(:one).id)
+    token = user.generate_token_for(:password_reset)
+
+    user.update!(password: "novasenha1234")
+
+    assert_nil User.find_by_token_for(:password_reset, token)
+  end
+
+  test "token adulterado ou de outra finalidade não redefine senha" do
+    user = users(:one)
+
+    assert_nil User.find_by_token_for(:password_reset, "lixo")
+    assert_nil User.find_by_token_for(:password_reset, user.generate_token_for(:password_reset).sub(/.$/, "x"))
+    assert_nil User.find_by_token_for(:password_reset, user.generate_token_for(:email_confirmation)),
+               "o token de confirmação não pode servir para trocar a senha"
+  end
+
+  test "o token de um usuário não serve para outro" do
+    token = users(:one).generate_token_for(:password_reset)
+
+    assert_equal users(:one), User.find_by_token_for(:password_reset, token)
+    assert_not_equal users(:two), User.find_by_token_for(:password_reset, token)
+  end
+
+  # --- confirmação de e-mail
+
+  test "conta nova começa sem o e-mail confirmado" do
+    user = User.create!(email: "novo@exemplo.com", password: "senhaforte123")
+
+    assert_not user.email_confirmed?
+    assert_nil user.email_confirmed_at
+  end
+
+  test "confirm_email! marca a data e não derruba as sessões" do
+    user = User.find(users(:one).id)
+
+    assert_no_changes -> { user.reload.token_version } do
+      user.confirm_email!
+    end
+    assert user.email_confirmed?
+  end
+
+  test "confirm_email! é idempotente e não muda a data da primeira confirmação" do
+    user = User.find(users(:one).id)
+    user.confirm_email!
+    primeira = user.reload.email_confirmed_at
+
+    travel 1.hour do
+      user.confirm_email!
+    end
+
+    assert_equal primeira.to_i, user.reload.email_confirmed_at.to_i
+  end
+
+  test "o token de confirmação expira em 3 dias" do
+    token = users(:one).generate_token_for(:email_confirmation)
+
+    travel 2.days do
+      assert_equal users(:one), User.find_by_token_for(:email_confirmation, token)
+    end
+    travel 4.days do
+      assert_nil User.find_by_token_for(:email_confirmation, token)
+    end
+  end
+
+  test "trocar o e-mail zera a confirmação, invalida o token antigo e pede outra confirmação" do
+    user = User.find(users(:one).id)
+    user.confirm_email!
+    token_antigo = user.generate_token_for(:email_confirmation)
+
+    assert_enqueued_email_with UserMailer, :email_confirmation, args: [ user ] do
+      user.update!(email: "trocado@exemplo.com")
+    end
+
+    assert_not user.reload.email_confirmed?
+    assert_nil User.find_by_token_for(:email_confirmation, token_antigo)
+  end
+
+  test "mudar outra coisa que não o e-mail não mexe na confirmação nem manda e-mail" do
+    user = User.find(users(:one).id)
+    user.confirm_email!
+
+    assert_no_enqueued_emails do
+      user.update!(password: "outrasenha12345")
+    end
+    assert user.reload.email_confirmed?
+  end
+
+  test "criar a conta envia o e-mail de confirmação" do
+    assert_enqueued_emails 1 do
+      User.create!(email: "novo@exemplo.com", password: "senhaforte123")
+    end
   end
 end
