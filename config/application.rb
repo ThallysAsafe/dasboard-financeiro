@@ -37,5 +37,22 @@ module App
     # das 21h o servidor já estaria no dia seguinte e geraria recorrências futuras.
     config.time_zone = "Brasilia"
     # config.eager_load_paths << Rails.root.join("extras")
+
+    # Jobs e agendamento com GoodJob (fila no próprio Postgres). O modo async roda
+    # o executor e o scheduler de cron dentro do processo web, sem worker extra.
+    # O cron é fixado no fuso de Brasília: o dia do mês das recorrências é o dia
+    # local, e o job é idempotente, então uma execução perdida (app fora do ar à
+    # meia-noite) é recuperada pela seguinte.
+    config.active_job.queue_adapter = :good_job
+    config.good_job.execution_mode = :async
+    config.good_job.max_threads = 2 # o pool do banco é pequeno e compartilhado com o Puma
+    config.good_job.enable_cron = !Rails.env.test?
+    config.good_job.cron = {
+      sync_recurring_entries: {
+        cron: "5 0 * * * America/Sao_Paulo",
+        class: "SyncRecurringEntriesJob",
+        description: "Gera os lançamentos recorrentes devidos de todos os usuários"
+      }
+    }
   end
 end

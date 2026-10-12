@@ -1,4 +1,5 @@
 require "test_helper"
+require "rake"
 
 class SyncRecurringEntriesJobTest < ActiveJob::TestCase
   def template(user, **attrs)

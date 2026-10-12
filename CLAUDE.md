@@ -72,6 +72,8 @@ Rules the generator encodes, all load-bearing:
 - Backfill is floored at `MAX_BACKFILL_MONTHS` (120) counted back from today. The cut is on the window, not the list size: the loop walks oldest→newest, so capping by count would drop the *recent* months.
 - Deleting a template is `dependent: :nullify` — the entries it already generated really happened and stay in the history.
 
+Scheduling: GoodJob (Postgres-backed queue, tables from migration `CreateGoodJobs`) runs `SyncRecurringEntriesJob` daily at 00:05 `America/Sao_Paulo` from `config.good_job.cron` in `config/application.rb`. `execution_mode = :async` runs the executor and the cron thread inside the web process, so there is no worker service to deploy (GoodJob's production default is `:external`, which would silently never run — keep it explicit). `max_threads = 2` because the DB pool is shared with Puma. The test env uses the `:test` adapter with cron off. A missed tick is harmless: the job is idempotent and backfills. `bin/rails recurring:sync` runs it by hand.
+
 Generation is triggered by the `syncRecurringEntries` mutation (plus implicitly on template create/update), never from a query resolver: the dashboard requests `balance`, `totalIncome` and the two `transactions` lists in one document, so a side-effecting query field would run several times per page load and would also fire on any read, including in tests. `DashboardController` cannot trigger it either — it has no `current_user` (see below).
 
 ### Frontend

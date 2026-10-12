@@ -71,15 +71,21 @@ têm limite de tentativas (Rack::Attack).
 
 ### Lançamentos recorrentes
 
-Um template (descrição, valor, dia do mês, datas) gera lançamentos reais. A geração
-é idempotente e nunca cria datas futuras. Ela roda quando o dashboard abre, mas o
-ideal é **agendar uma vez por dia**, para os saldos não dependerem de uma visita:
+Ao criar uma receita ou despesa, marque **"Repetir todo mês"** e escolha o dia: isso
+cria um template que gera o lançamento de verdade todo mês. A geração é idempotente
+e nunca cria datas futuras (um template do dia 10 só gera o lançamento do mês a
+partir do dia 10).
 
-```bash
-bin/rails recurring:sync
-```
+**Quem dispara é um scheduler embutido** (GoodJob, com a fila no próprio Postgres):
+todo dia às **00:05 (horário de Brasília)** roda o `SyncRecurringEntriesJob` para
+todos os usuários. Não precisa de cron externo, Redis nem de um processo separado: o
+agendador roda dentro do próprio servidor web (`execution_mode = :async`).
 
-Exemplo de cron (00:05): `5 0 * * * cd /caminho/do/app && bin/rails recurring:sync`.
+Se o app estiver fora do ar às 00:05, nada se perde: o job seguinte, ou a próxima
+abertura do dashboard, gera o que ficou devido.
+
+Para rodar na mão: `bin/rails recurring:sync`. A configuração do horário está em
+`config/application.rb` (`config.good_job.cron`).
 
 ## Produção
 
