@@ -15,7 +15,7 @@ module Mutations
 
       field :recurring_income, Types::RecurringIncomeType, null: true
       field :generated_count, Integer, null: false
-      field :errors, [String], null: false
+      field :errors, [ String ], null: false
 
       def resolve(id:, **attributes)
         user = context[:current_user]

@@ -19,7 +19,7 @@ module JsonWebToken
   def self.encode(payload, exp = 24.hours.from_now)
     # Adiciona tempo de expiração ao payload
     payload[:exp] = exp.to_i
-    
+
     # Codifica o token usando a chave secreta
     JWT.encode(payload, SECRET_KEY, ALGORITHM)
   end

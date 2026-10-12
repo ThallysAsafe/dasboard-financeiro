@@ -8,7 +8,7 @@ module Mutations
       argument :initial_balance, Float, required: false
 
       field :wallet, Types::WalletType, null: true
-      field :errors, [String], null: false
+      field :errors, [ String ], null: false
 
       def resolve(id:, **attributes)
         user = context[:current_user]

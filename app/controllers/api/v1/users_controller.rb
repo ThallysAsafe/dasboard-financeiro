@@ -28,12 +28,12 @@ module Api
           }
         }, status: :ok
       rescue ActiveRecord::RecordNotFound
-        render json: { error: 'Usuário não encontrado' }, status: :not_found
+        render json: { error: "Usuário não encontrado" }, status: :not_found
       end
 
       # POST /api/v1/users
       # Cria um novo usuário (requer autenticação)
-      # 
+      #
       # Corpo da requisição:
       # {
       #   "email": "novo@exemplo.com",
@@ -70,7 +70,7 @@ module Api
           render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
         end
       rescue ActiveRecord::RecordNotFound
-        render json: { error: 'Usuário não encontrado' }, status: :not_found
+        render json: { error: "Usuário não encontrado" }, status: :not_found
       end
 
       # DELETE /api/v1/users/:id
@@ -79,9 +79,9 @@ module Api
         user = User.find(params[:id])
         user.destroy
 
-        render json: { message: 'Usuário removido com sucesso' }, status: :ok
+        render json: { message: "Usuário removido com sucesso" }, status: :ok
       rescue ActiveRecord::RecordNotFound
-        render json: { error: 'Usuário não encontrado' }, status: :not_found
+        render json: { error: "Usuário não encontrado" }, status: :not_found
       end
 
       private

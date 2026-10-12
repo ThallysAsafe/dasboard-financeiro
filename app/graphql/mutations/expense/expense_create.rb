@@ -10,7 +10,7 @@ module Mutations
       argument :wallet_id, ID, required: false
 
       field :expense, Types::ExpenseType, null: true
-      field :errors, [String], null: false
+      field :errors, [ String ], null: false
 
       def resolve(description:, amount:, date:, category: nil, wallet_id: nil)
         user = context[:current_user]

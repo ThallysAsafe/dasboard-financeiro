@@ -10,7 +10,7 @@ module Mutations
     # carregamento — e ainda dispararia em qualquer leitura, inclusive nos testes.
     class SyncRecurringEntries < GraphQL::Schema::Mutation
       field :created_count, Integer, null: false
-      field :errors, [String], null: false
+      field :errors, [ String ], null: false
 
       def resolve
         user = context[:current_user]

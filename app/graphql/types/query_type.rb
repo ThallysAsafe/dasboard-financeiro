@@ -21,7 +21,7 @@ module Types
     end
 
     # --- QUERIES DE CARTEIRAS (WALLETS) ---
-    field :wallets, [Types::WalletType], null: false, description: "Lista todas as carteiras do usuário autenticado"
+    field :wallets, [ Types::WalletType ], null: false, description: "Lista todas as carteiras do usuário autenticado"
     def wallets
       require_user!
       context[:current_user].wallets.order(created_at: :asc)
@@ -38,7 +38,7 @@ module Types
     end
 
     # --- QUERIES DE RECEITAS (INCOMES) ---
-    field :incomes, [Types::IncomeType], null: false, description: "Lista todas as receitas do usuário autenticado"
+    field :incomes, [ Types::IncomeType ], null: false, description: "Lista todas as receitas do usuário autenticado"
     def incomes
       require_user!
       context[:current_user].incomes.order(date: :desc)
@@ -55,7 +55,7 @@ module Types
     end
 
     # --- QUERIES DE DESPESAS (EXPENSES) ---
-    field :expenses, [Types::ExpenseType], null: false, description: "Lista todas as despesas do usuário autenticado"
+    field :expenses, [ Types::ExpenseType ], null: false, description: "Lista todas as despesas do usuário autenticado"
     def expenses
       require_user!
       context[:current_user].expenses.order(date: :desc)

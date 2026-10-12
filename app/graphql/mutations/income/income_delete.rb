@@ -6,7 +6,7 @@ module Mutations
       argument :id, ID, required: true
 
       field :income, Types::IncomeType, null: true
-      field :errors, [String], null: false
+      field :errors, [ String ], null: false
 
       def resolve(id:)
         user = context[:current_user]

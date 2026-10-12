@@ -8,7 +8,7 @@ module Mutations
 
       field :token, String, null: true
       field :user, Types::UserType, null: true
-      field :errors, [String], null: false
+      field :errors, [ String ], null: false
 
       def resolve(email:, password:)
         if AuthThrottle.exceeded?("login/ip", context[:ip]) || AuthThrottle.exceeded?("login/email", email)
@@ -21,7 +21,7 @@ module Mutations
           token = JsonWebToken.issue_for(user)
           { token: token, user: user, errors: [] }
         else
-          { token: nil, user: nil, errors: ["Email ou senha inválidos"] }
+          { token: nil, user: nil, errors: [ "Email ou senha inválidos" ] }
         end
       end
     end

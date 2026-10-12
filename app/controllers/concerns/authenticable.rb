@@ -8,7 +8,7 @@ module Authenticable
   included do
     # Método executado antes de cada action
     before_action :authenticate_request!
-    
+
     # Disponibiliza @current_user para os controllers
     attr_reader :current_user
   end
@@ -19,7 +19,7 @@ module Authenticable
   # Se o token for inválido, retorna erro 401 (Unauthorized)
   def authenticate_request!
     @current_user = find_user_from_token
-    
+
     render_unauthorized unless @current_user
   end
 
@@ -27,7 +27,7 @@ module Authenticable
   # Formato esperado: "Authorization: Bearer <token>"
   # @return [String, nil] Token JWT ou nil
   def token_from_request_headers
-    request.headers['Authorization']&.split(' ')&.last
+    request.headers["Authorization"]&.split(" ")&.last
   end
 
   # Busca o usuário a partir do token JWT
@@ -38,6 +38,6 @@ module Authenticable
 
   # Retorna erro 401 (Não autorizado)
   def render_unauthorized
-    render json: { error: 'Unauthorized - Token inválido ou ausente' }, status: :unauthorized
+    render json: { error: "Unauthorized - Token inválido ou ausente" }, status: :unauthorized
   end
 end

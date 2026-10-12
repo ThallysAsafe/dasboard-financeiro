@@ -9,13 +9,13 @@ class GraphqlController < ApplicationController
     variables = prepare_variables(params[:variables])
     query = params[:query]
     operation_name = params[:operationName]
-    
+
     # Contexto do GraphQL com usuário autenticado via JWT
     context = {
       current_user: current_user,
-      ip: request.remote_ip,
+      ip: request.remote_ip
     }
-    
+
     result = AppSchema.execute(query, variables: variables, context: context, operation_name: operation_name)
     render json: result
   rescue StandardError => e
@@ -34,7 +34,7 @@ class GraphqlController < ApplicationController
   # Extrai o token do header Authorization
   # Formato esperado: "Authorization: Bearer <token>"
   def token_from_request_headers
-    request.headers['Authorization']&.split(' ')&.last
+    request.headers["Authorization"]&.split(" ")&.last
   end
 
   # Busca o usuário a partir do token JWT (nil se ausente, inválido ou revogado)
@@ -66,6 +66,6 @@ class GraphqlController < ApplicationController
     logger.error e.message
     logger.error e.backtrace.join("\n")
 
-    render json: { errors: [{ message: e.message, backtrace: e.backtrace }], data: {} }, status: 500
+    render json: { errors: [ { message: e.message, backtrace: e.backtrace } ], data: {} }, status: 500
   end
 end

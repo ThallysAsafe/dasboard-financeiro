@@ -7,20 +7,20 @@ module Api
     class AuthController < ApplicationController
       # Pula a autenticação para login (não faz sentido pedir token para fazer login)
       skip_before_action :verify_authenticity_token
-      
+
       # Adiciona autenticação apenas para as actions que precisam
       include Authenticable
-      skip_before_action :authenticate_request!, only: [:login]
+      skip_before_action :authenticate_request!, only: [ :login ]
 
       # POST /api/v1/auth/login
       # Faz login e retorna um token JWT
-      # 
+      #
       # Corpo da requisição:
       # {
       #   "email": "usuario@exemplo.com",
       #   "password": "senha123"
       # }
-      # 
+      #
       # Resposta de sucesso (200):
       # {
       #   "token": "eyJhbGciOiJIUzI1NiJ9...",
@@ -36,7 +36,7 @@ module Api
         if user&.authenticate(params[:password])
           # Gera o token JWT com o ID do usuário
           token = JsonWebToken.issue_for(user)
-          
+
           render json: {
             token: token,
             user: {
@@ -45,14 +45,14 @@ module Api
             }
           }, status: :ok
         else
-          render json: { error: 'Email ou senha inválidos' }, status: :unauthorized
+          render json: { error: "Email ou senha inválidos" }, status: :unauthorized
         end
       end
 
       # GET /api/v1/auth/me
       # Retorna informações do usuário autenticado
       # Requer token JWT no header: Authorization: Bearer <token>
-      # 
+      #
       # Resposta de sucesso (200):
       # {
       #   "user": {
@@ -71,7 +71,7 @@ module Api
 
       # POST /api/v1/auth/logout
       # Logout: revoga todos os tokens emitidos para o usuário
-      # 
+      #
       # Resposta de sucesso (200):
       # {
       #   "message": "Logout realizado com sucesso"
@@ -80,7 +80,7 @@ module Api
         # Invalida todos os tokens do usuário incrementando a versão que eles
         # carregam; o cliente ainda deve descartar o token localmente.
         current_user.revoke_tokens!
-        render json: { message: 'Logout realizado com sucesso' }, status: :ok
+        render json: { message: "Logout realizado com sucesso" }, status: :ok
       end
     end
   end

@@ -13,20 +13,20 @@ Rails.application.routes.draw do
   get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
   get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
 
-  
-  get '/login', to: 'sessions#new'
-  get '/dashboard', to: 'dashboard#index'
-  root to: 'sessions#new'
+
+  get "/login", to: "sessions#new"
+  get "/dashboard", to: "dashboard#index"
+  root to: "sessions#new"
 
 
   # API REST v1 - Apenas Autenticação
   namespace :api do
     namespace :v1 do
       # Rotas de autenticação (REST)
-      post 'auth/login', to: 'auth#login'      # Login (retorna token JWT)
-      get 'auth/me', to: 'auth#me'             # Perfil do usuário autenticado
-      post 'auth/logout', to: 'auth#logout'    # Logout
-      
+      post "auth/login", to: "auth#login"      # Login (retorna token JWT)
+      get "auth/me", to: "auth#me"             # Perfil do usuário autenticado
+      post "auth/logout", to: "auth#logout"    # Logout
+
       # CRUD de usuários agora é feito via GraphQL
     end
   end

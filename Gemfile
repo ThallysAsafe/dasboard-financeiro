@@ -21,10 +21,10 @@ gem "jbuilder"
 # Gemfile
 
 # Para API GraphQL
-gem 'graphql'
+gem "graphql"
 
 # Para gerar e ler JSON Web Tokens (JWT)
-gem 'jwt'
+gem "jwt"
 # Use Redis adapter to run Action Cable in production
 # gem "redis", ">= 4.0.1"
 
