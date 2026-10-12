@@ -80,6 +80,10 @@ Scheduling: GoodJob (Postgres-backed queue, tables from migration `CreateGoodJob
 
 Generation is triggered by the `syncRecurringEntries` mutation (plus implicitly on template create/update), never from a query resolver: the dashboard requests `balance`, `totalIncome` and the two `transactions` lists in one document, so a side-effecting query field would run several times per page load and would also fire on any read, including in tests. `DashboardController` cannot trigger it either — it has no `current_user` (see below).
 
+### Frameworks loaded
+
+`config/application.rb` requires only the railties the app uses (Active Model/Record/Job, Action Controller/View/Mailer, Sprockets, test_unit) instead of `rails/all`. **Active Storage, Action Cable, Action Text, Action Mailbox and Turbo/Stimulus are deliberately absent**: `rails/all` mounts public routes for each (blob direct uploads, mail ingress, `/cable`, Turbo Native), which the app doesn't need and which widen the attack surface (46 routes became 20). If you need one, `require` its railtie there and add its config back — and think about auth on the routes it brings. The importmap pins only the page modules; there is no default layout (every page renders with `layout: false`).
+
 ### Frontend
 
 Server-rendered pages that behave like a static SPA: `sessions#new` and `registrations#new` (`/signup`, reuses `login.css`) and `dashboard#index` are HTML documents rendered with `layout: false`. Their JS and CSS are plain files, not inline: `app/javascript/{dashboard,login,signup}.js` (ES modules pinned in `config/importmap.rb`, loaded with `javascript_importmap_tags "dashboard"`) and `app/assets/stylesheets/{dashboard,login}.css` (`stylesheet_link_tag`). Auth is a server-side concern: the dashboard redirects to `/login` without a valid cookie, and the JS never sees the token (nothing in `localStorage`); it asks `/api/v1/auth/me` for the user and calls `/graphql` with `fetch` + `X-Requested-With`.

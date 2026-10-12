@@ -1,6 +1,18 @@
 require_relative "boot"
 
-require "rails/all"
+# Só os frameworks que o app usa, em vez de rails/all. Active Storage, Action Cable,
+# Action Text e Action Mailbox não são usados e cada um publica rotas próprias (direct
+# upload de blobs, ingress de e-mail, /cable) sem necessidade, ampliando a superfície de
+# ataque. Precisando de algum, é só requerer o railtie dele aqui.
+require "rails"
+require "active_model/railtie"
+require "active_job/railtie"
+require "active_record/railtie"
+require "action_controller/railtie"
+require "action_view/railtie"
+require "action_mailer/railtie"
+require "rails/test_unit/railtie"
+require "sprockets/railtie"
 
 # Require the gems listed in Gemfile, including any gems
 # you've limited to :test, :development, or :production.
