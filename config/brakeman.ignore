@@ -15,22 +15,6 @@
       "user_input": null,
       "confidence": "High",
       "note": "Rails 7.2.3 fora de suporte (desde 2026-08-09). Aceito temporariamente: atualizar para o Rails 8 em PR separado. Revisar até 2026-12-31."
-    },
-    {
-      "warning_type": "Unmaintained Dependency",
-      "warning_code": 121,
-      "fingerprint": "edf687f759ec9765bd5db185dbc615c80af77d6e7e19386fc42934e7a80307af",
-      "check_name": "EOLRuby",
-      "message": "Support for Ruby 3.2.2 ended on 2026-03-31",
-      "file": ".ruby-version",
-      "line": 1,
-      "link": "https://brakemanscanner.org/docs/warning_types/unmaintained_dependency/",
-      "code": null,
-      "render_path": null,
-      "location": null,
-      "user_input": null,
-      "confidence": "High",
-      "note": "Ruby 3.2.2 fora de suporte (desde 2026-03-31). Aceito temporariamente: atualizar para o Ruby 3.4 em PR separado. Revisar até 2026-12-31."
     }
   ],
   "updated": "2026-10-12 00:00:00 +0000",
