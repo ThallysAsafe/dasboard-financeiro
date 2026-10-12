@@ -76,4 +76,4 @@ Two timezone traps the JS avoids on purpose: dates are formatted by splitting th
 
 ### Known state
 
-`bin/rubocop` reports ~90 pre-existing offenses (single-quoted strings, trailing whitespace, `[String]` array spacing), so the CI lint job is already red independently of any new work. All are safe-autocorrectable if you ever want to clear them in a dedicated commit.
+`bin/rubocop` is clean; keep it that way (CI runs it).
