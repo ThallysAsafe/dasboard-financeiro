@@ -7,6 +7,7 @@ module Types
     field :amount, Float, null: false
     field :date, GraphQL::Types::ISO8601Date, null: false
     field :category, String, null: true
+    field :recurring_expense_id, ID, null: true, description: "Preenchido quando o lançamento veio de uma recorrência"
     field :user, Types::UserType, null: false
     field :wallet, Types::WalletType, null: true
     field :created_at, GraphQL::Types::ISO8601DateTime, null: false

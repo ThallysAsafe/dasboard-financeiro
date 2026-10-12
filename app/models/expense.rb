@@ -1,6 +1,7 @@
 class Expense < ApplicationRecord
   belongs_to :user
   belongs_to :wallet, optional: true
+  belongs_to :recurring_expense, optional: true
 
   validates :description, presence: true
   validates :amount, presence: true, numericality: { greater_than: 0 }

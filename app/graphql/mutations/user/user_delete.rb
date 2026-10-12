@@ -7,13 +7,14 @@ class Mutations::User::UserDelete < GraphQL::Schema::Mutation
   def resolve(id:)
     raise GraphQL::ExecutionError, "Você precisa estar autenticado" unless context[:current_user]
     
-    user = User.find(id)
+    # Autorização por dono: ninguém exclui a conta de outro usuário.
+    raise GraphQL::ExecutionError, "Você não tem permissão para excluir este usuário" unless id.to_s == context[:current_user].id.to_s
+
+    user = context[:current_user]
     if user.destroy
       { user: user, errors: [] }
     else
       { user: nil, errors: user.errors.full_messages }
     end
-  rescue ActiveRecord::RecordNotFound
-    raise GraphQL::ExecutionError, "Usuário não encontrado"
   end
 end

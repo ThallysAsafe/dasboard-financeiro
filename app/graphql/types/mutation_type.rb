@@ -22,5 +22,18 @@ module Types
     field :expense_create, mutation: Mutations::Expense::ExpenseCreate
     field :expense_update, mutation: Mutations::Expense::ExpenseUpdate
     field :expense_delete, mutation: Mutations::Expense::ExpenseDelete
+
+    # Mutations de Receita Recorrente
+    field :recurring_income_create, mutation: Mutations::RecurringIncome::RecurringIncomeCreate
+    field :recurring_income_update, mutation: Mutations::RecurringIncome::RecurringIncomeUpdate
+    field :recurring_income_delete, mutation: Mutations::RecurringIncome::RecurringIncomeDelete
+
+    # Mutations de Despesa Recorrente
+    field :recurring_expense_create, mutation: Mutations::RecurringExpense::RecurringExpenseCreate
+    field :recurring_expense_update, mutation: Mutations::RecurringExpense::RecurringExpenseUpdate
+    field :recurring_expense_delete, mutation: Mutations::RecurringExpense::RecurringExpenseDelete
+
+    # Geração automática dos lançamentos recorrentes devidos
+    field :sync_recurring_entries, mutation: Mutations::Recurring::SyncRecurringEntries
   end
 end
