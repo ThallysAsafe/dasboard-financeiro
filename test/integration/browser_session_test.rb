@@ -171,12 +171,52 @@ class BrowserSessionTest < ActionDispatch::IntegrationTest
 
     assert_match(/'nonce-/, script_src)
     assert_no_match(/unsafe-inline|unsafe-eval/, script_src)
+    assert_no_match(/unsafe-inline/, csp[/style-src [^;]+/]) # style-src-attr é outra diretiva
     assert_match(/object-src 'none'/, csp)
     assert_match(/frame-ancestors 'none'/, csp)
 
     nonce = script_src[/'nonce-([^']+)'/, 1]
-    assert_includes response.body, %(<script nonce="#{nonce}">)
-    assert_includes response.body, %(<style nonce="#{nonce}">)
+    inline_scripts = response.body.scan(%r{<script\b([^>]*)>(.*?)</script>}m)
+    assert_not_empty inline_scripts
+    inline_scripts.each { |attrs, _| assert_includes attrs, %(nonce="#{nonce}") }
+  end
+
+  test "as páginas não têm <style> nem JavaScript próprio inline: só arquivos servidos pelo app" do
+    pages = []
+    get "/login" # sem sessão: com sessão ele redireciona para o dashboard
+    pages << [ "/login", response.body ]
+    login
+    get "/dashboard"
+    pages << [ "/dashboard", response.body ]
+
+    pages.each do |path, body|
+
+      assert_no_match(/<style\b/, body, path)
+      body.scan(%r{<script\b[^>]*>(.*?)</script>}m).flatten.each do |inline|
+        assert_no_match(/function |=>|fetch\(/, inline, "#{path}: JS próprio inline")
+      end
+    end
+  end
+
+  test "o CSS e o JS de cada página são servidos como assets" do
+    bodies = {}
+    get "/login"
+    bodies["login"] = response.body
+    login
+    get "/dashboard"
+    bodies["dashboard"] = response.body
+
+    bodies.each do |name, body|
+      css = body[%r{href="(/assets/#{name}-[^"]+\.css)"}, 1]
+      js = body[%r{(/assets/#{name}-[^"]+\.js)}, 1]
+
+      assert css, "#{name} deveria linkar #{name}.css"
+      assert js, "#{name} deveria referenciar #{name}.js"
+      [ css, js ].each do |asset|
+        get asset
+        assert_response :ok, asset
+      end
+    end
   end
 
   test "CSP: o nonce muda a cada resposta" do

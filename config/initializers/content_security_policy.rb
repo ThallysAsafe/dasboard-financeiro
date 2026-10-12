@@ -1,7 +1,8 @@
-# Política de segurança de conteúdo. As páginas são documentos autocontidos com
-# <script> e <style> inline, liberados apenas por nonce (um valor por resposta):
-# um script injetado não tem o nonce e não executa. Handlers inline
-# (onclick=...) não são permitidos; a página usa addEventListener.
+# Política de segurança de conteúdo. JS e CSS das páginas são arquivos servidos
+# pelo próprio app ('self'). O único script inline é o do importmap, liberado por
+# nonce (um valor por resposta): um script injetado não tem o nonce e não executa.
+# Nem <style> nem handlers inline (onclick=...) são permitidos; a página usa
+# addEventListener.
 Rails.application.configure do
   config.content_security_policy do |policy|
     policy.default_src :none
@@ -21,7 +22,7 @@ Rails.application.configure do
   end
 
   config.content_security_policy_nonce_generator = ->(_request) { SecureRandom.base64(16) }
-  config.content_security_policy_nonce_directives = %w[script-src style-src]
+  config.content_security_policy_nonce_directives = %w[script-src]
 end
 
 # O GraphiQL (só em desenvolvimento) carrega scripts de CDN e usa inline; fora

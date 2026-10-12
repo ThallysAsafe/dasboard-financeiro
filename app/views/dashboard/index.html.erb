@@ -7,12 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <%# Partials em .css/.js e não .html: em desenvolvimento o Rails anota cada
-        partial HTML com <!-- BEGIN ... -->, e dentro de <script> o <!-- inicia
-        um comentário de linha, o que comentaria a primeira linha do código. %>
-    <style nonce="<%= content_security_policy_nonce %>">
-<%= raw render(partial: "styles", formats: [ :css ]) %>
-    </style>
+    <%= stylesheet_link_tag "dashboard" %>
 </head>
 <body>
     <nav class="navbar">
@@ -86,8 +81,6 @@
 
     <%= render "entry_modal" %>
 
-    <script nonce="<%= content_security_policy_nonce %>">
-<%= raw render(partial: "scripts", formats: [ :js ]) %>
-    </script>
+    <%= javascript_importmap_tags "dashboard" %>
 </body>
 </html>
