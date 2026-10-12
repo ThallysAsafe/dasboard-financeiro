@@ -5,6 +5,7 @@ income_one:
   date: 2026-07-31
   category: MyString
   user: one
+  wallet: one
 
 expense_one:
   kind: expense
@@ -13,6 +14,7 @@ expense_one:
   date: 2026-07-31
   category: MyString
   user: one
+  wallet: one
 
 income_two:
   kind: income
@@ -21,6 +23,7 @@ income_two:
   date: 2026-07-31
   category: MyString
   user: two
+  wallet: two
 
 expense_two:
   kind: expense
@@ -29,3 +32,4 @@ expense_two:
   date: 2026-07-31
   category: MyString
   user: two
+  wallet: two

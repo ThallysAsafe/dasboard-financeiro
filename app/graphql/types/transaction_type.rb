@@ -10,7 +10,7 @@ module Types
     field :category, String, null: true
     field :recurring_transaction_id, ID, null: true, description: "Preenchido quando o lançamento veio de uma recorrência"
     field :user, Types::UserType, null: false
-    field :wallet, Types::WalletType, null: true
+    field :wallet, Types::WalletType, null: false
     field :created_at, GraphQL::Types::ISO8601DateTime, null: false
     field :updated_at, GraphQL::Types::ISO8601DateTime, null: false
 

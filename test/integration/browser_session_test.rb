@@ -80,10 +80,10 @@ class BrowserSessionTest < ActionDispatch::IntegrationTest
   test "CSRF: mutation com cookie mas sem o cabeçalho não executa" do
     login
 
-    result = gql('mutation { walletCreate(name: "Invasora", initialBalance: 1) { errors } }', headers: {})
+    result = gql('mutation { transactionCreate(kind: EXPENSE, description: "Invasora", amount: 1, date: "2026-08-01") { errors } }', headers: {})
 
     assert_match(/autenticado/, result["errors"].first["message"])
-    assert_equal 0, users(:one).wallets.where(name: "Invasora").count
+    assert_equal 0, users(:one).transactions.where(description: "Invasora").count
   end
 
   test "Bearer continua funcionando para clientes de API" do

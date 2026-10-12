@@ -36,8 +36,30 @@ class TransactionTest < ActiveSupport::TestCase
     assert_equal users(:one).transactions.count, income.count + expense.count
   end
 
-  test "carteira e recorrência são opcionais" do
-    assert build(wallet: nil, recurring_transaction: nil).valid?
+  test "a recorrência é opcional" do
+    assert build(recurring_transaction: nil).valid?
+  end
+
+  test "a carteira do usuário é atribuída ao criar, sem ninguém informar" do
+    t = build
+    t.valid?
+
+    assert_equal users(:one).wallet, t.wallet
+  end
+
+  test "não aceita a carteira de outro usuário" do
+    t = build(wallet: users(:two).wallet)
+
+    assert_not t.valid?
+    assert_includes t.errors[:wallet], "não pertence ao usuário"
+  end
+
+  test "o banco exige carteira" do
+    t = build
+    t.wallet = nil
+    t.user = users(:one)
+
+    assert_raises(ActiveRecord::NotNullViolation) { t.save!(validate: false) }
   end
 
   test "o banco rejeita lançamento sem tipo, valor ou data" do
@@ -50,7 +72,7 @@ class TransactionTest < ActiveSupport::TestCase
       kind: :income, description: "Salário", amount: 100, day_of_month: 5, start_date: Date.new(2026, 8, 5)
     )
     template.transactions.create!(kind: :income, user: users(:one), description: "S", amount: 100, date: Date.new(2026, 8, 5))
-    duplicate = template.transactions.build(kind: :income, user: users(:one), description: "S", amount: 100, date: Date.new(2026, 8, 5))
+    duplicate = template.transactions.build(kind: :income, user: users(:one), wallet: users(:one).wallet, description: "S", amount: 100, date: Date.new(2026, 8, 5))
 
     assert_raises(ActiveRecord::RecordNotUnique) { duplicate.save!(validate: false) }
   end

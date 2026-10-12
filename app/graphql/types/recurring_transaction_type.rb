@@ -14,7 +14,7 @@ module Types
     field :last_generated_on, GraphQL::Types::ISO8601Date, null: true
     field :next_occurrence, GraphQL::Types::ISO8601Date, null: true, description: "Próxima data em que um lançamento será gerado"
     field :user, Types::UserType, null: false
-    field :wallet, Types::WalletType, null: true
+    field :wallet, Types::WalletType, null: false
     field :created_at, GraphQL::Types::ISO8601DateTime, null: false
     field :updated_at, GraphQL::Types::ISO8601DateTime, null: false
 

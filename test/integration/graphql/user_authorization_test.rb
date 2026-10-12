@@ -37,9 +37,9 @@ class UserAuthorizationGraphqlTest < ActiveSupport::TestCase
 
   test "userDelete em outro usuário é negado e preserva a conta e os dados" do
     other = users(:two)
-    other.wallets.create!(name: "Carteira", initial_balance: 10)
+    other.transactions.create!(kind: :income, description: "Salário", amount: 10, date: Date.new(2026, 8, 1))
 
-    assert_no_difference [ "User.count", "Wallet.count" ] do
+    assert_no_difference [ "User.count", "Wallet.count", "Transaction.count" ] do
       result = execute(DELETE, variables: { "id" => other.id.to_s })
       assert_match(/permissão/, result["errors"].first["message"])
     end

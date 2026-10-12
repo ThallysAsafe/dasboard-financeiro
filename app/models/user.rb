@@ -1,7 +1,8 @@
 class User < ApplicationRecord
   has_secure_password
 
-  has_many :wallets, dependent: :destroy
+  # A carteira vai primeiro: apagá-la leva os lançamentos e templates junto.
+  has_one :wallet, dependent: :destroy
   has_many :transactions, dependent: :destroy
   has_many :recurring_transactions, dependent: :destroy
 
@@ -14,10 +15,13 @@ class User < ApplicationRecord
   # Só exige senha na criação ou quando ela está sendo trocada; senão não dá
   # para atualizar o e-mail sem reenviar a senha.
   MIN_PASSWORD_LENGTH = 10
+  DEFAULT_WALLET_NAME = "Carteira".freeze
 
   validates :password, presence: true, length: { minimum: MIN_PASSWORD_LENGTH },
                        if: -> { new_record? || !password.nil? }
   validate :password_differs_from_email, if: -> { password.present? }
+
+  after_create :create_default_wallet
 
   # Trocar a senha derruba as sessões abertas (tokens emitidos antes).
   before_update :bump_token_version, if: :will_save_change_to_password_digest?
@@ -43,6 +47,10 @@ class User < ApplicationRecord
   end
 
   private
+
+  def create_default_wallet
+    create_wallet!(name: DEFAULT_WALLET_NAME, initial_balance: 0)
+  end
 
   def bump_token_version
     self.token_version += 1

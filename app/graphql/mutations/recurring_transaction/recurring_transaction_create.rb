@@ -14,19 +14,16 @@ module Mutations
       argument :start_date, GraphQL::Types::ISO8601Date, required: true
       argument :end_date, GraphQL::Types::ISO8601Date, required: false
       argument :category, String, required: false
-      argument :wallet_id, ID, required: false
 
       field :recurring_transaction, Types::RecurringTransactionType, null: true
       field :generated_count, Integer, null: false
       field :errors, [ String ], null: false
 
-      def resolve(kind:, description:, amount:, day_of_month:, start_date:, end_date: nil, category: nil, wallet_id: nil)
+      def resolve(kind:, description:, amount:, day_of_month:, start_date:, end_date: nil, category: nil)
         user = authenticated_user!
-        wallet = wallet_id ? find_wallet!(user, wallet_id) : user.wallets.first
-
         template = user.recurring_transactions.build(
           kind: kind, description: description, amount: amount, day_of_month: day_of_month,
-          start_date: start_date, end_date: end_date, category: category, wallet: wallet
+          start_date: start_date, end_date: end_date, category: category
         )
 
         if template.save

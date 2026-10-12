@@ -6,11 +6,11 @@ class GraphqlLimitsTest < ActiveSupport::TestCase
   DASHBOARD = <<~GRAPHQL
     query Dashboard($limit: Int!) {
       balance totalIncome totalExpense
-      wallets { id name balance totalIncome totalExpense }
-      incomes: transactions(kind: INCOME, limit: $limit) { id description amount date category recurringTransactionId wallet { id name } }
-      expenses: transactions(kind: EXPENSE, limit: $limit) { id description amount date category recurringTransactionId wallet { id name } }
-      recurringIncomes: recurringTransactions(kind: INCOME) { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
-      recurringExpenses: recurringTransactions(kind: EXPENSE) { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
+      wallet { id name balance totalIncome totalExpense }
+      incomes: transactions(kind: INCOME, limit: $limit) { id description amount date category recurringTransactionId }
+      expenses: transactions(kind: EXPENSE, limit: $limit) { id description amount date category recurringTransactionId }
+      recurringIncomes: recurringTransactions(kind: INCOME) { id description amount dayOfMonth startDate endDate category active nextOccurrence }
+      recurringExpenses: recurringTransactions(kind: EXPENSE) { id description amount dayOfMonth startDate endDate category active nextOccurrence }
     }
   GRAPHQL
 
@@ -23,12 +23,11 @@ class GraphqlLimitsTest < ActiveSupport::TestCase
     AppSchema.execute(query, variables: variables, context: { current_user: user }).to_h
   end
 
-  def seed(user, count, wallet: nil)
-    wallet ||= user.wallets.create!(name: "Carteira", initial_balance: 0)
+  def seed(user, count)
     count.times do |i|
-      user.transactions.create!(kind: :income, description: "Receita #{i}", amount: 10, date: Date.new(2026, 1, 1) + i, wallet: wallet)
+      user.transactions.create!(kind: :income, description: "Receita #{i}", amount: 10, date: Date.new(2026, 1, 1) + i)
     end
-    wallet
+    user.wallet
   end
 
   def count_selects(&block)
@@ -50,7 +49,7 @@ class GraphqlLimitsTest < ActiveSupport::TestCase
     seed(users(:one), 1)
     nested = "id"
     6.times { nested = "wallet { transactions { #{nested} } }" }
-    result = execute("{ wallets { transactions { #{nested} } } }")
+    result = execute("{ wallet { transactions { #{nested} } } }")
 
     assert_match(/depth/i, result["errors"].first["message"])
     assert_nil result["data"]

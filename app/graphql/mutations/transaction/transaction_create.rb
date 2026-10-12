@@ -12,18 +12,15 @@ module Mutations
       argument :amount, Float, required: true
       argument :date, GraphQL::Types::ISO8601Date, required: true
       argument :category, String, required: false
-      argument :wallet_id, ID, required: false
 
       field :transaction, Types::TransactionType, null: true
       field :errors, [ String ], null: false
 
-      def resolve(kind:, description:, amount:, date:, category: nil, wallet_id: nil)
+      def resolve(kind:, description:, amount:, date:, category: nil)
         user = authenticated_user!
-        wallet = wallet_id ? find_wallet!(user, wallet_id) : user.wallets.first
-
         transaction = user.transactions.build(
           kind: kind, description: description, amount: amount,
-          date: date, category: category, wallet: wallet
+          date: date, category: category
         )
 
         if transaction.save

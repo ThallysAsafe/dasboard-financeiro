@@ -7,8 +7,8 @@ class TransactionsGraphqlTest < ActiveSupport::TestCase
   end
 
   CREATE = <<~GRAPHQL
-    mutation($kind: TransactionKind!, $description: String!, $amount: Float!, $date: ISO8601Date!, $category: String, $walletId: ID) {
-      transactionCreate(kind: $kind, description: $description, amount: $amount, date: $date, category: $category, walletId: $walletId) {
+    mutation($kind: TransactionKind!, $description: String!, $amount: Float!, $date: ISO8601Date!, $category: String) {
+      transactionCreate(kind: $kind, description: $description, amount: $amount, date: $date, category: $category) {
         transaction { id kind description amount date category wallet { id } }
         errors
       }
@@ -36,10 +36,22 @@ class TransactionsGraphqlTest < ActiveSupport::TestCase
     assert_equal 1, users(:one).transactions.expense.count
   end
 
-  test "sem carteira informada usa a primeira do usuário" do
+  test "o lançamento vai para a carteira do usuário, que o cliente não escolhe" do
     created = create
 
-    assert_equal users(:one).wallets.first.id.to_s, created.dig("transaction", "wallet", "id")
+    assert_equal users(:one).wallet.id.to_s, created.dig("transaction", "wallet", "id")
+    assert_equal users(:one).wallet, Transaction.find(created.dig("transaction", "id")).wallet
+  end
+
+  test "o schema não aceita walletId em lançamentos nem em recorrências" do
+    [ 'transactionCreate(kind: INCOME, description: "x", amount: 1, date: "2026-08-01", walletId: "1")',
+      'transactionUpdate(id: "1", walletId: "1")',
+      'recurringTransactionCreate(kind: INCOME, description: "x", amount: 1, dayOfMonth: 1, startDate: "2026-08-01", walletId: "1")' ].each do |call|
+      result = execute("mutation { #{call} { errors } }")
+
+      assert result["errors"].present?, call
+    end
+    assert_equal 0, Transaction.count
   end
 
   test "valor inválido volta em errors, sem erro GraphQL" do
@@ -57,15 +69,6 @@ class TransactionsGraphqlTest < ActiveSupport::TestCase
     assert_equal 0, Transaction.count
   end
 
-  test "não usa a carteira de outro usuário" do
-    other_wallet = users(:two).wallets.create!(name: "Alheia", initial_balance: 0)
-    result = execute(CREATE, variables: { "kind" => "INCOME", "description" => "x", "amount" => 1.0,
-                                          "date" => "2026-08-01", "walletId" => other_wallet.id.to_s })
-
-    assert_equal "Carteira não encontrada", result["errors"].first["message"]
-    assert_equal 0, Transaction.count
-  end
-
   test "exige autenticação" do
     result = execute(CREATE, variables: { "kind" => "INCOME", "description" => "x", "amount" => 1.0, "date" => "2026-08-01" }, user: nil)
 
@@ -75,9 +78,9 @@ class TransactionsGraphqlTest < ActiveSupport::TestCase
   # --- atualizar
 
   UPDATE = <<~GRAPHQL
-    mutation($id: ID!, $description: String, $amount: Float, $walletId: ID) {
-      transactionUpdate(id: $id, description: $description, amount: $amount, walletId: $walletId) {
-        transaction { description amount kind wallet { id } }
+    mutation($id: ID!, $description: String, $amount: Float) {
+      transactionUpdate(id: $id, description: $description, amount: $amount) {
+        transaction { description amount kind }
         errors
       }
     }
@@ -97,16 +100,6 @@ class TransactionsGraphqlTest < ActiveSupport::TestCase
     result = execute("mutation { transactionUpdate(id: \"1\", kind: INCOME) { errors } }")
 
     assert result["errors"].present?
-  end
-
-  test "walletId nulo explícito tira a carteira; ausente mantém" do
-    id = create.dig("transaction", "id")
-
-    kept = execute(UPDATE, variables: { "id" => id, "description" => "Só descrição" }).dig("data", "transactionUpdate")
-    assert_not_nil kept.dig("transaction", "wallet")
-
-    cleared = execute(UPDATE, variables: { "id" => id, "walletId" => nil }).dig("data", "transactionUpdate")
-    assert_nil cleared.dig("transaction", "wallet")
   end
 
   test "um usuário não altera nem enxerga o lançamento de outro" do
@@ -158,8 +151,7 @@ class TransactionsGraphqlTest < ActiveSupport::TestCase
   end
 
   test "totalIncome, totalExpense e balance somam cada tipo com o sinal certo" do
-    users(:one).wallets.destroy_all
-    users(:one).wallets.create!(name: "A", initial_balance: 1000)
+    users(:one).wallet.update!(initial_balance: 1000)
     create("kind" => "INCOME", "amount" => 300.0)
     create("kind" => "INCOME", "amount" => 200.0)
     create("kind" => "EXPENSE", "amount" => 150.0)
@@ -171,35 +163,36 @@ class TransactionsGraphqlTest < ActiveSupport::TestCase
     assert_equal 1350.0, data["balance"] # 1000 + 500 - 150
   end
 
-  test "o saldo conta lançamentos sem carteira, e o da carteira só os dela" do
-    users(:one).wallets.destroy_all
-    wallet = users(:one).wallets.create!(name: "A", initial_balance: 100)
-    create({ "kind" => "INCOME", "amount" => 50.0, "walletId" => wallet.id.to_s })
-    users(:one).transactions.create!(kind: :income, description: "solto", amount: 10, date: Date.new(2026, 8, 1))
+  test "uma regra só: o saldo geral é o da carteira, e os totais batem com os dela" do
+    users(:one).wallet.update!(initial_balance: 100)
+    create("kind" => "INCOME", "amount" => 50.0)
+    create("kind" => "EXPENSE", "amount" => 30.0)
+    create({ "kind" => "INCOME", "amount" => 999.0 }, user: users(:two)) # de outro usuário: não entra
 
-    data = execute("{ balance wallets { balance totalIncome totalExpense } }")["data"]
+    data = execute("{ balance totalIncome totalExpense wallet { balance totalIncome totalExpense } }")["data"]
 
-    assert_equal 160.0, data["balance"]
-    assert_equal 150.0, data["wallets"].first["balance"]
-    assert_equal 50.0, data["wallets"].first["totalIncome"]
+    assert_equal 120.0, data["balance"]
+    assert_equal data["balance"], data.dig("wallet", "balance")
+    assert_equal data["totalIncome"], data.dig("wallet", "totalIncome")
+    assert_equal data["totalExpense"], data.dig("wallet", "totalExpense")
   end
 
   test "wallet.transactions é paginada e filtrável por tipo" do
-    wallet = users(:one).wallets.first || users(:one).wallets.create!(name: "A", initial_balance: 0)
-    5.times { |i| create({ "description" => "R#{i}", "walletId" => wallet.id.to_s }) }
-    create({ "kind" => "EXPENSE", "description" => "D", "walletId" => wallet.id.to_s })
+    5.times { |i| create({ "description" => "R#{i}" }) }
+    create({ "kind" => "EXPENSE", "description" => "D" })
 
-    page = execute("query($id: ID!) { wallet(id: $id) { transactions(kind: INCOME, limit: 2, offset: 2) { description } } }",
-                   variables: { "id" => wallet.id.to_s }).dig("data", "wallet", "transactions")
+    page = execute("{ wallet { transactions(kind: INCOME, limit: 2, offset: 2) { description } } }")
+             .dig("data", "wallet", "transactions")
 
     assert_equal 2, page.size
   end
 
-  test "excluir a carteira exclui os lançamentos dela" do
-    wallet = users(:one).wallets.create!(name: "Temporária", initial_balance: 0)
-    create({ "walletId" => wallet.id.to_s })
+  test "excluir a carteira leva os lançamentos e as recorrências dela" do
+    wallet = users(:one).wallet
+    create
+    users(:one).recurring_transactions.create!(kind: :income, description: "S", amount: 1, day_of_month: 1, start_date: Date.new(2026, 8, 1))
 
-    assert_difference "Transaction.count", -1 do
+    assert_difference [ "Transaction.count", "RecurringTransaction.count" ], -1 do
       wallet.destroy
     end
   end

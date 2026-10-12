@@ -3,11 +3,11 @@ const DASHBOARD_QUERY = `
         balance
         totalIncome
         totalExpense
-        wallets { id name balance totalIncome totalExpense }
-        incomes: transactions(kind: INCOME, limit: $limit) { id description amount date category recurringTransactionId wallet { id name } }
-        expenses: transactions(kind: EXPENSE, limit: $limit) { id description amount date category recurringTransactionId wallet { id name } }
-        recurringIncomes: recurringTransactions(kind: INCOME) { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
-        recurringExpenses: recurringTransactions(kind: EXPENSE) { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
+        wallet { id name balance totalIncome totalExpense }
+        incomes: transactions(kind: INCOME, limit: $limit) { id description amount date category recurringTransactionId }
+        expenses: transactions(kind: EXPENSE, limit: $limit) { id description amount date category recurringTransactionId }
+        recurringIncomes: recurringTransactions(kind: INCOME) { id description amount dayOfMonth startDate endDate category active nextOccurrence }
+        recurringExpenses: recurringTransactions(kind: EXPENSE) { id description amount dayOfMonth startDate endDate category active nextOccurrence }
     }
 `;
 
@@ -108,7 +108,7 @@ async function loadDashboard() {
     try {
         const data = await graphqlRequest(DASHBOARD_QUERY, { limit: PAGE_SIZE });
 
-        state.wallets = data.wallets || [];
+        state.wallets = data.wallet ? [data.wallet] : [];
         state.incomes = data.incomes || [];
         state.expenses = data.expenses || [];
         state.hasMore.income = state.incomes.length === PAGE_SIZE;
@@ -200,7 +200,7 @@ async function loadMore(kind) {
         const data = await graphqlRequest(
             `query($kind: TransactionKind!, $limit: Int!, $offset: Int!) {
                 transactions(kind: $kind, limit: $limit, offset: $offset) {
-                    id description amount date category recurringTransactionId wallet { id name }
+                    id description amount date category recurringTransactionId
                 }
             }`,
             { kind: kind.toUpperCase(), limit: PAGE_SIZE, offset: list.length }
@@ -246,7 +246,6 @@ function renderRecurring() {
 function entryMeta(entry) {
     const parts = [];
     if (entry.category) parts.push(escapeHtml(entry.category));
-    if (entry.wallet) parts.push(escapeHtml(entry.wallet.name));
     return parts.join(' • ') || '—';
 }
 
@@ -254,17 +253,7 @@ function recurringMeta(template) {
     const parts = [`desde ${formatMonthYear(template.startDate)}`];
     if (template.endDate) parts.push(`até ${formatDate(template.endDate)}`);
     if (template.active && template.nextOccurrence) parts.push(`próximo: ${formatDate(template.nextOccurrence)}`);
-    if (template.wallet) parts.push(escapeHtml(template.wallet.name));
     return parts.join(' • ');
-}
-
-function renderWalletOptions(selectedId) {
-    const select = document.getElementById('entryWallet');
-    const options = ['<option value="">Sem carteira</option>'].concat(
-        state.wallets.map(wallet => `<option value="${wallet.id}">${escapeHtml(wallet.name)}</option>`)
-    );
-    select.innerHTML = options.join('');
-    select.value = selectedId == null ? '' : String(selectedId);
 }
 
 // --- Modal ---
@@ -276,9 +265,6 @@ function openCreate(kind) {
     document.getElementById('entryDate').value = todayISO();
     document.getElementById('entryRecurring').disabled = false;
     document.getElementById('entryActiveWrapper').style.display = 'none';
-    // Pré-seleciona a primeira carteira: lançamento sem carteira é sempre
-    // possível, mas raramente é o que o usuário quer.
-    renderWalletOptions(state.wallets.length ? state.wallets[0].id : null);
     toggleRecurringFields();
 
     document.getElementById('modalTitle').textContent = kind === 'income' ? 'Nova Receita' : 'Nova Despesa';
@@ -297,7 +283,6 @@ function openEdit(kind, id) {
     document.getElementById('entryAmount').value = entry.amount;
     document.getElementById('entryDate').value = entry.date;
     document.getElementById('entryCategory').value = entry.category || '';
-    renderWalletOptions(entry.wallet ? entry.wallet.id : null);
 
     // Um lançamento avulso não vira recorrência (e vice-versa): são registros
     // de naturezas diferentes.
@@ -321,7 +306,6 @@ function openEditRecurring(kind, id) {
     document.getElementById('entryAmount').value = template.amount;
     document.getElementById('entryDate').value = template.startDate;
     document.getElementById('entryCategory').value = template.category || '';
-    renderWalletOptions(template.wallet ? template.wallet.id : null);
 
     document.getElementById('entryRecurring').checked = true;
     document.getElementById('entryRecurring').disabled = true;
@@ -374,18 +358,15 @@ async function handleEntrySubmit(event) {
     const originalLabel = button.textContent;
     hideModalAlert();
 
-    const walletValue = document.getElementById('entryWallet').value;
     const variables = {
         description: document.getElementById('entryDescription').value.trim(),
         amount: parseFloat(document.getElementById('entryAmount').value),
-        category: document.getElementById('entryCategory').value.trim() || null,
-        walletId: walletValue || null
+        category: document.getElementById('entryCategory').value.trim() || null
     };
     const args = [
         { name: 'description', type: 'String!' },
         { name: 'amount', type: 'Float!' },
-        { name: 'category', type: 'String' },
-        { name: 'walletId', type: 'ID' }
+        { name: 'category', type: 'String' }
     ];
 
     if (modalState.recurring) {

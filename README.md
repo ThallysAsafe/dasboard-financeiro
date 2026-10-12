@@ -1,6 +1,6 @@
 # Dashboard Financeiro
 
-Dashboard de finanças pessoais: carteiras, receitas, despesas e lançamentos
+Dashboard de finanças pessoais: carteira, receitas, despesas e lançamentos
 recorrentes (salário, aluguel…), com saldo consolidado.
 
 **Stack:** Rails 7.2 · Ruby 3.2.2 · PostgreSQL 15 · GraphQL (graphql-ruby) · JWT.
@@ -16,7 +16,7 @@ docker compose exec app bin/rails db:prepare
 ```
 
 Abra `http://localhost:3000/login`. Ainda não há tela de cadastro: crie o primeiro
-usuário pelo console (a senha precisa ter 10+ caracteres):
+usuário pelo console (a senha precisa ter 10+ caracteres; a carteira dele é criada junto):
 
 ```bash
 docker compose exec app bin/rails console
@@ -40,7 +40,7 @@ O CI (`.github/workflows/ci.yml`) roda esses quatro a cada PR.
 
 ## Como funciona
 
-- **GraphQL** (`POST /graphql`): usuários, carteiras, receitas, despesas,
+- **GraphQL** (`POST /graphql`): usuários, a carteira, receitas, despesas,
   recorrências e resumos financeiros. Tudo é escopado ao usuário autenticado.
 - **REST** (`/api/v1/auth/*`): só autenticação (`login`, `me`, `logout`).
 - **Páginas** (`/login`, `/dashboard`): HTML servido pelo Rails que consome as duas
@@ -63,7 +63,7 @@ curl -s localhost:3000/graphql -H 'Content-Type: application/json' \
 # 2. usar
 curl -s localhost:3000/graphql -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $TOKEN" \
-  -d '{"query":"{ balance totalIncome totalExpense wallets { name balance } }"}'
+  -d '{"query":"{ balance totalIncome totalExpense wallet { name balance } }"}'
 ```
 
 O logout e a troca de senha invalidam todos os tokens do usuário. Login e cadastro

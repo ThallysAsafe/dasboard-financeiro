@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_12_150000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_12_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -25,7 +25,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_12_150000) do
     t.boolean "active", default: true, null: false
     t.date "last_generated_on"
     t.bigint "user_id", null: false
-    t.bigint "wallet_id"
+    t.bigint "wallet_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["user_id", "active"], name: "index_recurring_transactions_on_user_id_and_active"
@@ -40,7 +40,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_12_150000) do
     t.date "date", null: false
     t.string "category"
     t.bigint "user_id", null: false
-    t.bigint "wallet_id"
+    t.bigint "wallet_id", null: false
     t.bigint "recurring_transaction_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -66,7 +66,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_12_150000) do
     t.bigint "user_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["user_id"], name: "index_wallets_on_user_id"
+    t.index ["user_id"], name: "index_wallets_on_user_id", unique: true
   end
 
   add_foreign_key "recurring_transactions", "users"

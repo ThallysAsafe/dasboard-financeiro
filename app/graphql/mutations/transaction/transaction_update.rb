@@ -12,7 +12,6 @@ module Mutations
       argument :amount, Float, required: false
       argument :date, GraphQL::Types::ISO8601Date, required: false
       argument :category, String, required: false
-      argument :wallet_id, ID, required: false
 
       field :transaction, Types::TransactionType, null: true
       field :errors, [ String ], null: false
@@ -21,7 +20,7 @@ module Mutations
         user = authenticated_user!
         transaction = user.transactions.find(id)
 
-        if transaction.update(with_wallet(user, attributes))
+        if transaction.update(attributes)
           { transaction: transaction, errors: [] }
         else
           { transaction: nil, errors: transaction.errors.full_messages }

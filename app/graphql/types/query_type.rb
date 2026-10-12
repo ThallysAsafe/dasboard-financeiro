@@ -22,21 +22,11 @@ module Types
       context[:current_user]
     end
 
-    # --- QUERIES DE CARTEIRAS (WALLETS) ---
-    field :wallets, [ Types::WalletType ], null: false, description: "Lista todas as carteiras do usuário autenticado"
-    def wallets
+    # --- CARTEIRA ---
+    field :wallet, Types::WalletType, null: false, description: "A carteira do usuário autenticado (cada usuário tem uma)"
+    def wallet
       require_user!
-      context[:current_user].wallets.order(created_at: :asc)
-    end
-
-    field :wallet, Types::WalletType, null: true, description: "Busca uma carteira do usuário autenticado por ID" do
-      argument :id, ID, required: true
-    end
-    def wallet(id:)
-      require_user!
-      context[:current_user].wallets.find(id)
-    rescue ActiveRecord::RecordNotFound
-      raise GraphQL::ExecutionError, "Carteira não encontrada"
+      context[:current_user].wallet
     end
 
     # --- LANÇAMENTOS (RECEITAS E DESPESAS) ---
@@ -77,15 +67,10 @@ module Types
       context[:current_user].transactions.expense.sum(:amount).to_f
     end
 
-    field :balance, Float, null: false, description: "Saldo total geral (Saldo das carteiras + Receitas - Despesas)"
+    field :balance, Float, null: false, description: "Saldo atual (saldo inicial da carteira + receitas - despesas)"
     def balance
       require_user!
-      user = context[:current_user]
-      # Somar Wallet#balance deixaria de fora os lançamentos sem carteira, que
-      # ainda assim entram em totalIncome/totalExpense e fariam os três cards do
-      # dashboard se contradizerem.
-      user.wallets.sum(:initial_balance).to_f +
-        user.transactions.income.sum(:amount).to_f - user.transactions.expense.sum(:amount).to_f
+      context[:current_user].wallet.balance
     end
 
     # --- LANÇAMENTOS RECORRENTES ---

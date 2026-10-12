@@ -8,10 +8,8 @@ module Types
     field :user_update, mutation: Mutations::User::UserUpdate
     field :user_delete, mutation: Mutations::User::UserDelete
 
-    # Mutations de Carteira (Wallet)
-    field :wallet_create, mutation: Mutations::Wallet::WalletCreate
+    # Carteira: criada junto com o usuário e única; só se edita nome e saldo inicial
     field :wallet_update, mutation: Mutations::Wallet::WalletUpdate
-    field :wallet_delete, mutation: Mutations::Wallet::WalletDelete
 
     # Mutations de Lançamento (receita ou despesa, conforme `kind`)
     field :transaction_create, mutation: Mutations::Transaction::TransactionCreate

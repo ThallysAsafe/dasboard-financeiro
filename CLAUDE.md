@@ -35,7 +35,7 @@ CI (`.github/workflows/ci.yml`) runs brakeman, importmap audit, rubocop, and tes
 ### Two APIs, one auth scheme
 
 - **REST (`/api/v1/auth/*`)** — authentication only: `login` (sets the JWT in an HttpOnly cookie), `me`, `logout` (revokes every token of the user). Controller: `app/controllers/api/v1/auth_controller.rb`.
-- **GraphQL (`POST /graphql`)** — everything else: users, wallets and transactions (incomes/expenses) CRUD plus financial summaries. GraphiQL is mounted at `/graphiql` in development.
+- **GraphQL (`POST /graphql`)** — everything else: users, the wallet, and transactions (incomes/expenses) CRUD plus financial summaries. GraphiQL is mounted at `/graphiql` in development.
 
 JWT flow: `JsonWebToken` (`app/controllers/concerns/json_web_token.rb`) signs tokens with `secret_key_base` (HS256 pinned on verification), 24h expiry, payload `{ user_id:, tv: }`. `tv` is `users.token_version`: `JsonWebToken.user_for` rejects a token whose `tv` no longer matches, so `User#revoke_tokens!` (logout) and a password change invalidate every token already issued. `user_for` is the single entry point for both consumers:
 
@@ -50,13 +50,15 @@ Brute force: `AuthThrottle` + Rack::Attack limit login (5/min per IP and per e-m
 
 - Schema: `app/graphql/app_schema.rb`; queries in `types/query_type.rb`; mutations registered in `types/mutation_type.rb` and implemented one class per file under `app/graphql/mutations/<resource>/<resource>_<action>.rb` (e.g. `mutations/wallet/wallet_create.rb`).
 - Mutations return `{ resource:, errors: [] }` — validation failures go into `errors` as full messages, not GraphQL errors.
-- Authorization is by scoping: resolvers always go through `context[:current_user].wallets/transactions/recurring_transactions`, never `Model.find` directly (except the user queries).
+- Authorization is by scoping: resolvers always go through `context[:current_user].wallet/transactions/recurring_transactions`, never `Model.find` directly (except the user queries).
 - Inside `Mutations::Transaction` / `Mutations::RecurringTransaction` the constants `Transaction` / `RecurringTransaction` resolve to the *module*, not the model — always go through `user.transactions` / `user.recurring_transactions`. Shared mutation helpers (`authenticated_user!`, `find_wallet!`, `with_wallet`) live in `Mutations::Scoped`.
 - List fields paginate with `limit` (default 100, max 500) and `offset` via `Types::Pagination`.
 
 ### Domain model
 
-`User` has many `Wallet`s and `Transaction`s. A `Transaction` is an income or an expense, told apart by the integer enum `kind` (`Transaction::KINDS`, GraphQL enum `TransactionKind`: `INCOME`/`EXPENSE`); `amount` is always positive and the sign comes from `kind`. It belongs to a user and optionally to a wallet. The kind is fixed at creation (`transactionUpdate` has no `kind` argument — reclassifying money means delete + create). Income/expense used to be two parallel tables and class trees; they were merged because the files were line-for-line identical (see migration `UnifyTransactions`). `Wallet#balance` = `initial_balance + total_income - total_expense`, but the top-level `balance` query deliberately does **not** sum wallet balances — it computes `wallets.sum(:initial_balance) + transactions.income.sum - transactions.expense.sum`, so that entries with a null `wallet_id` (which `totalIncome`/`totalExpense` always count) don't make the dashboard's three summary cards contradict each other.
+Every `User` has exactly **one** `Wallet` (`has_one`, unique index on `wallets.user_id`), created in `User#after_create` and destroyed only with the user — there are no wallet create/delete mutations and `walletUpdate` takes no id (it edits name and initial balance of the caller's wallet). A `Transaction` is an income or an expense, told apart by the integer enum `kind` (`Transaction::KINDS`, GraphQL enum `TransactionKind`: `INCOME`/`EXPENSE`); `amount` is always positive and the sign comes from `kind`. The kind is fixed at creation (`transactionUpdate` has no `kind` argument — reclassifying money means delete + create). Transactions and recurring templates belong to the user **and** to the wallet (`wallet_id NOT NULL`); the `WalletBound` concern assigns the user's wallet on create — clients never pick it, and the GraphQL mutations have no `walletId` — and validates `wallet.user_id == user_id`, since the foreign keys alone would let a row of user A point at user B's wallet. Income/expense used to be two parallel tables and class trees; they were merged because the files were line-for-line identical (see migration `UnifyTransactions`; `OneWalletPerUser` later merged multiple wallets by summing initial balances so no user's total changed).
+
+There is a single balance rule: `Wallet#balance` = `initial_balance + total_income - total_expense`, and the top-level `balance`, `totalIncome` and `totalExpense` are that wallet's numbers, so the dashboard's cards can never disagree.
 
 ### Recurrence
 
