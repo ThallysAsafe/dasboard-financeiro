@@ -83,8 +83,57 @@ module ReliableTyping
   end
 end
 
+# Teclas especiais (Esc, Enter, Tab) enviadas com send_keys: o mesmo problema, agora no
+# teclado. Se nenhum keydown chegou ao documento, o evento é despachado por JavaScript (o
+# app escuta keydown no document). O texto digitado em campos já é tratado em ReliableTyping.
+module ReliableKeys
+  SPECIAL_KEYS = { escape: "Escape", enter: "Enter", tab: "Tab" }.freeze
+  ARM_PROBE = <<~JS.freeze
+    window.__keydowns = 0;
+    if (!window.__keyProbe) {
+      window.__keyProbe = true;
+      document.addEventListener('keydown', () => { window.__keydowns += 1; }, true);
+    }
+  JS
+
+  def send_keys(*args)
+    specials = args.select { |key| SPECIAL_KEYS.key?(key) }
+    armed = specials.any? && arm_key_probe
+    super
+    return unless armed && key_lost?
+
+    ApplicationSystemTestCase.js_fallbacks[:tecla] += 1
+    specials.each do |key|
+      driver.execute_script("document.dispatchEvent(new KeyboardEvent('keydown', { key: arguments[0], bubbles: true }))",
+                            SPECIAL_KEYS.fetch(key))
+    end
+  end
+
+  private
+
+  def arm_key_probe
+    driver.execute_script(ARM_PROBE)
+    true
+  rescue StandardError
+    false
+  end
+
+  # 0 = a sonda existe e nenhuma tecla chegou; nil = documento novo; erro = outro estado.
+  def key_lost?
+    10.times do
+      return false unless driver.evaluate_script("window.__keydowns") == 0
+
+      sleep 0.05
+    end
+    true
+  rescue StandardError
+    false
+  end
+end
+
 Capybara::Selenium::Node.prepend(ReliableClick)
 Capybara::Selenium::Node.prepend(ReliableTyping)
+Capybara::Selenium::Node.prepend(ReliableKeys)
 
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # Quantas entradas o Chrome perdeu e foram refeitas por JavaScript (ver ReliableClick).

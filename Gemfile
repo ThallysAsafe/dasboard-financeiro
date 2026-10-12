@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
-gem "rails", "~> 7.2.3"
+gem "rails", "~> 8.1.0"
 # The original asset pipeline for Rails [https://github.com/rails/sprockets-rails]
 gem "sprockets-rails"
 # Use postgresql as the database for Active Record
@@ -41,7 +41,7 @@ gem "rack-attack"
 gem "good_job"
 
 # Traduções do Rails (mensagens de validação etc.) para pt-BR
-gem "rails-i18n", "~> 7.0"
+gem "rails-i18n", "~> 8.0"
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
@@ -72,5 +72,7 @@ group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem "capybara"
   gem "selenium-webdriver"
+  # minitest 6 tirou minitest/mock do núcleo (stub/Mock usados nos testes de navegador)
+  gem "minitest-mock"
 end
 gem "graphiql-rails", group: :development
