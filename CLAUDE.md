@@ -22,11 +22,13 @@ Test, lint, and security scan (run inside the container with `docker compose exe
 bin/rails test                                      # all tests (Minitest)
 bin/rails test test/models/wallet_test.rb           # single file
 bin/rails test test/models/wallet_test.rb:10        # single test by line
-bin/rails test:system                               # system tests (Capybara/Selenium)
+bin/rails test:system                               # system tests (Capybara/Selenium, headless Chromium)
 bin/rubocop                                         # lint (rubocop-rails-omakase)
 bin/brakeman --no-pager                             # security static analysis
 bin/importmap audit                                 # JS dependency audit
 ```
+
+System tests (`test/system/`) drive the real UI in headless Chrome; `ApplicationSystemTestCase` fails any test that leaves a CSP violation or uncaught JS error in the browser console, clears the Rack::Attack counters in `setup` (the whole suite shares 127.0.0.1) and reads `CHROME_BIN`/`CHROMEDRIVER_PATH` (set in `Dockerfile.dev`; CI uses the runner's Chrome). The dev container needs `docker compose build app` once to get Chromium. Browser-native validation (e.g. `min` on the amount field) stops a submit before it reaches the server — to test a server-side error use a value that passes the browser but fails the model.
 
 CI (`.github/workflows/ci.yml`) runs brakeman, importmap audit, rubocop, and tests on every PR and push to main.
 

@@ -33,13 +33,17 @@ Em desenvolvimento o GraphiQL fica em `http://localhost:3000/graphiql`.
 Tudo dentro do container (`docker compose exec app ...`):
 
 ```bash
-bin/rails test              # suíte (Minitest)
+bin/rails test              # suíte rápida (Minitest: modelos, GraphQL, integração)
+bin/rails test:system       # testes de navegador (Chrome headless): login, cadastro, dashboard
 bin/rubocop                 # lint (rubocop-rails-omakase)
 bin/brakeman --no-pager     # análise estática de segurança
 bin/importmap audit         # dependências JS
 ```
 
-O CI (`.github/workflows/ci.yml`) roda esses quatro a cada PR.
+Os testes de sistema precisam do Chromium, que o `Dockerfile.dev` instala (variáveis
+`CHROME_BIN` e `CHROMEDRIVER_PATH`); depois de atualizar o repositório, rode
+`docker compose build app`. O CI (`.github/workflows/ci.yml`) roda a suíte, os testes de
+sistema, o rubocop, o brakeman e a auditoria de JS a cada PR.
 
 ## Como funciona
 
