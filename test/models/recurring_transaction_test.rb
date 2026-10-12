@@ -214,4 +214,12 @@ class RecurringTransactionTest < ActiveSupport::TestCase
     assert t.update(description: "Novo nome")
     assert t.reload.valid?, "não valida de novo a data de início se ela não mudou"
   end
+
+  test "recusa valor acima do máximo da coluna" do
+    t = @user.recurring_transactions.build(kind: :income, description: "X", amount: 10**12, day_of_month: 5,
+                                           start_date: Date.current.beginning_of_month)
+
+    assert_not t.valid?
+    assert t.errors.key?(:amount)
+  end
 end

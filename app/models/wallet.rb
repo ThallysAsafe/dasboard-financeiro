@@ -8,7 +8,8 @@ class Wallet < ApplicationRecord
   has_many :recurring_transactions, dependent: :destroy
 
   validates :name, presence: true
-  validates :initial_balance, presence: true, numericality: true
+  validates :initial_balance, presence: true,
+                              numericality: { greater_than_or_equal_to: -MAX_MONEY, less_than_or_equal_to: MAX_MONEY }
   validates :user_id, uniqueness: true
 
   def total_income

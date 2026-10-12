@@ -14,7 +14,8 @@ class RecurringTransaction < ApplicationRecord
   enum :kind, Transaction::KINDS, validate: true
 
   validates :description, presence: true
-  validates :amount, presence: true, numericality: { greater_than: 0 }
+  validates :amount, presence: true,
+                     numericality: { greater_than: 0, less_than_or_equal_to: MAX_MONEY }
   validates :day_of_month, presence: true,
             numericality: { only_integer: true,
                             greater_than_or_equal_to: 1,

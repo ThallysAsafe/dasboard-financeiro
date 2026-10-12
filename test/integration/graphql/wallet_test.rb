@@ -37,6 +37,14 @@ class WalletGraphqlTest < ActiveSupport::TestCase
     assert_not_equal "", users(:one).wallet.reload.name
   end
 
+  test "walletUpdate com saldo gigante volta em errors, sem erro 500" do
+    result = execute("mutation { walletUpdate(initialBalance: 1.0e12) { wallet { name } errors } }").dig("data", "walletUpdate")
+
+    assert_nil result["wallet"]
+    assert_match(/Saldo inicial/, result["errors"].join)
+    assert_not_equal 1.0e12, users(:one).wallet.reload.initial_balance
+  end
+
   test "walletUpdate exige autenticação" do
     result = execute('mutation { walletUpdate(name: "X") { errors } }', user: nil)
 
