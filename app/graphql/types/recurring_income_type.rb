@@ -17,6 +17,12 @@ module Types
     field :created_at, GraphQL::Types::ISO8601DateTime, null: false
     field :updated_at, GraphQL::Types::ISO8601DateTime, null: false
 
+    # Todo registro exposto pertence ao usuário autenticado; evita um
+    # SELECT de usuário por linha (N+1).
+    def user
+      context[:current_user]
+    end
+
     def next_occurrence
       object.next_occurrence
     end

@@ -2,6 +2,9 @@
 
 module Types
   class QueryType < Types::BaseObject
+    DEFAULT_PAGE_SIZE = 100
+    MAX_PAGE_SIZE = 500
+
     # Query: Perfil do usuário autenticado
     field :me, Types::UserType, null: true, description: "Retorna o perfil do usuário autenticado"
     def me
@@ -38,10 +41,13 @@ module Types
     end
 
     # --- QUERIES DE RECEITAS (INCOMES) ---
-    field :incomes, [ Types::IncomeType ], null: false, description: "Lista todas as receitas do usuário autenticado"
-    def incomes
+    field :incomes, [ Types::IncomeType ], null: false, description: "Lista as receitas do usuário autenticado, da mais recente para a mais antiga (paginado)" do
+      argument :limit, Integer, required: false, default_value: DEFAULT_PAGE_SIZE, description: "Máximo de #{MAX_PAGE_SIZE}"
+      argument :offset, Integer, required: false, default_value: 0
+    end
+    def incomes(limit:, offset:)
       require_user!
-      context[:current_user].incomes.order(date: :desc)
+      paginate(context[:current_user].incomes.includes(:wallet).order(date: :desc, id: :desc), limit, offset)
     end
 
     field :income, Types::IncomeType, null: true, description: "Busca uma receita do usuário autenticado por ID" do
@@ -55,10 +61,13 @@ module Types
     end
 
     # --- QUERIES DE DESPESAS (EXPENSES) ---
-    field :expenses, [ Types::ExpenseType ], null: false, description: "Lista todas as despesas do usuário autenticado"
-    def expenses
+    field :expenses, [ Types::ExpenseType ], null: false, description: "Lista as despesas do usuário autenticado, da mais recente para a mais antiga (paginado)" do
+      argument :limit, Integer, required: false, default_value: DEFAULT_PAGE_SIZE, description: "Máximo de #{MAX_PAGE_SIZE}"
+      argument :offset, Integer, required: false, default_value: 0
+    end
+    def expenses(limit:, offset:)
       require_user!
-      context[:current_user].expenses.order(date: :desc)
+      paginate(context[:current_user].expenses.includes(:wallet).order(date: :desc, id: :desc), limit, offset)
     end
 
     field :expense, Types::ExpenseType, null: true, description: "Busca uma despesa do usuário autenticado por ID" do
@@ -98,7 +107,7 @@ module Types
     field :recurring_incomes, [ Types::RecurringIncomeType ], null: false, description: "Lista as receitas recorrentes do usuário autenticado"
     def recurring_incomes
       require_user!
-      context[:current_user].recurring_incomes.order(day_of_month: :asc)
+      context[:current_user].recurring_incomes.includes(:wallet).order(day_of_month: :asc)
     end
 
     field :recurring_income, Types::RecurringIncomeType, null: true, description: "Busca uma receita recorrente do usuário autenticado por ID" do
@@ -114,7 +123,7 @@ module Types
     field :recurring_expenses, [ Types::RecurringExpenseType ], null: false, description: "Lista as despesas recorrentes do usuário autenticado"
     def recurring_expenses
       require_user!
-      context[:current_user].recurring_expenses.order(day_of_month: :asc)
+      context[:current_user].recurring_expenses.includes(:wallet).order(day_of_month: :asc)
     end
 
     field :recurring_expense, Types::RecurringExpenseType, null: true, description: "Busca uma despesa recorrente do usuário autenticado por ID" do
@@ -128,6 +137,10 @@ module Types
     end
 
     private
+
+    def paginate(scope, limit, offset)
+      scope.limit(limit.clamp(1, MAX_PAGE_SIZE)).offset([ offset, 0 ].max)
+    end
 
     def require_user!
       raise GraphQL::ExecutionError, "Você precisa estar autenticado" unless context[:current_user]

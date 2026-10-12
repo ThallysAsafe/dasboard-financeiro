@@ -1,17 +1,18 @@
 const DASHBOARD_QUERY = `
-    query Dashboard {
+    query Dashboard($limit: Int!) {
         balance
         totalIncome
         totalExpense
         wallets { id name balance totalIncome totalExpense }
-        incomes { id description amount date category recurringIncomeId wallet { id name } }
-        expenses { id description amount date category recurringExpenseId wallet { id name } }
+        incomes(limit: $limit) { id description amount date category recurringIncomeId wallet { id name } }
+        expenses(limit: $limit) { id description amount date category recurringExpenseId wallet { id name } }
         recurringIncomes { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
         recurringExpenses { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
     }
 `;
 
-const state = { wallets: [], incomes: [], expenses: [], recurring: [] };
+const PAGE_SIZE = 100;
+const state = { wallets: [], incomes: [], expenses: [], recurring: [], hasMore: { income: false, expense: false } };
 let modalState = { kind: 'income', mode: 'create', id: null, recurring: false };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -79,11 +80,13 @@ async function syncRecurring() {
 
 async function loadDashboard() {
     try {
-        const data = await graphqlRequest(DASHBOARD_QUERY);
+        const data = await graphqlRequest(DASHBOARD_QUERY, { limit: PAGE_SIZE });
 
         state.wallets = data.wallets || [];
         state.incomes = data.incomes || [];
         state.expenses = data.expenses || [];
+        state.hasMore.income = state.incomes.length === PAGE_SIZE;
+        state.hasMore.expense = state.expenses.length === PAGE_SIZE;
         state.recurring = [
             ...(data.recurringIncomes || []).map(item => ({ ...item, kind: 'income' })),
             ...(data.recurringExpenses || []).map(item => ({ ...item, kind: 'expense' }))
@@ -158,7 +161,30 @@ function renderEntries(kind) {
                 </div>
             </div>
         `;
-    }).join('');
+    }).join('') + (state.hasMore[kind]
+        ? `<button class="btn-icon" style="margin:12px auto;display:block" onclick="loadMore('${kind}')">Carregar mais</button>`
+        : '');
+}
+
+// Busca a próxima página e anexa à lista; os totais do topo já cobrem tudo.
+async function loadMore(kind) {
+    const isIncome = kind === 'income';
+    const field = isIncome ? 'incomes' : 'expenses';
+    const link = isIncome ? 'recurringIncomeId' : 'recurringExpenseId';
+    const list = isIncome ? state.incomes : state.expenses;
+
+    try {
+        const data = await graphqlRequest(
+            `query($limit: Int!, $offset: Int!) { ${field}(limit: $limit, offset: $offset) { id description amount date category ${link} wallet { id name } } }`,
+            { limit: PAGE_SIZE, offset: list.length }
+        );
+        const page = data[field] || [];
+        list.push(...page);
+        state.hasMore[kind] = page.length === PAGE_SIZE;
+        renderEntries(kind);
+    } catch (error) {
+        showAlert('error', `Não foi possível carregar mais: ${error.message}`);
+    }
 }
 
 function renderRecurring() {

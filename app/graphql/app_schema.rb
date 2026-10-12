@@ -26,6 +26,13 @@ class AppSchema < GraphQL::Schema
   # Limit the size of incoming queries:
   max_query_string_tokens(5000)
 
+  # Wallet -> incomes -> wallet -> incomes... é um ciclo no grafo: sem limite de
+  # profundidade, um cliente monta uma query exponencialmente cara. O dashboard
+  # usa profundidade 3.
+  max_depth 8, count_introspection_fields: false
+  max_complexity 300
+  default_max_page_size 500
+
   # Stop validating when it encounters this many errors:
   validate_max_errors(100)
 
