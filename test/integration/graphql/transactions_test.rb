@@ -62,6 +62,14 @@ class TransactionsGraphqlTest < ActiveSupport::TestCase
     assert_equal 0, Transaction.count
   end
 
+  test "valor gigante volta em errors, sem estourar no banco (antes era um erro 500)" do
+    payload = create("amount" => 1.0e12)
+
+    assert_nil payload["transaction"]
+    assert_match(/menor ou igual a 99999999\.99/, payload["errors"].join)
+    assert_equal 0, Transaction.count
+  end
+
   test "tipo inexistente é rejeitado pelo schema" do
     result = execute(CREATE, variables: { "kind" => "TRANSFERENCIA", "description" => "x", "amount" => 1.0, "date" => "2026-08-01" })
 

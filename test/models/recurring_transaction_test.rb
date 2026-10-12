@@ -71,7 +71,10 @@ class RecurringTransactionTest < ActiveSupport::TestCase
 
   test "limita a retroação a exatamente 120 meses, mantendo os mais recentes" do
     hoje = Date.new(2026, 8, 9)
-    t = template(start_date: hoje - 30.years, day_of_month: 5)
+    t = template(day_of_month: 5)
+    # A validação já recusa início tão antigo; aqui interessa o corte do backfill em
+    # si, então força a data por fora (como num template criado antes do limite).
+    t.update_columns(start_date: hoje - 30.years)
 
     criados = t.generate_entries!(today: hoje)
 
@@ -164,5 +167,59 @@ class RecurringTransactionTest < ActiveSupport::TestCase
 
     assert_not t.valid?
     assert t.errors.of_kind?(:kind, :inclusion)
+  end
+
+  # --- janela de retroação
+
+  test "recusa data de início anterior à janela de 120 meses, em vez de cortar em silêncio" do
+    hoje = Date.current
+    antigo = @user.recurring_transactions.build(kind: :income, description: "Velho", amount: 1, day_of_month: 5,
+                                                start_date: RecurringTransaction.earliest_start_date(today: hoje) - 1.day)
+
+    assert_not antigo.valid?
+    assert antigo.errors[:start_date].first.include?("limite de retroação é de 120 meses")
+    assert antigo.errors[:start_date].first.match?(%r{\d{2}/\d{2}/\d{4}}), "mostra a data limite em pt-BR"
+  end
+
+  test "aceita exatamente o primeiro mês da janela" do
+    limite = RecurringTransaction.earliest_start_date
+    t = @user.recurring_transactions.build(kind: :income, description: "No limite", amount: 1, day_of_month: 5, start_date: limite)
+
+    assert t.valid?, t.errors.full_messages.inspect
+    datas = t.occurrence_dates
+    # A ocorrência deste mês pode ainda não ter chegado (dia 5 e hoje é dia 2), então
+    # são 120 ou 119; o que importa é começar no primeiro mês da janela.
+    assert_equal limite.beginning_of_month, datas.first.beginning_of_month
+    assert_operator datas.size, :>=, RecurringTransaction::MAX_BACKFILL_MONTHS - 1
+  end
+
+  test "o limite acompanha a data de hoje" do
+    assert_equal Date.new(2016, 9, 1), RecurringTransaction.earliest_start_date(today: Date.new(2026, 8, 9))
+    assert_equal Date.new(2017, 2, 1), RecurringTransaction.earliest_start_date(today: Date.new(2027, 1, 31))
+  end
+
+  test "mudar a data de início para antes da janela também é recusado" do
+    t = template(start_date: Date.current.beginning_of_month)
+    t.start_date = RecurringTransaction.earliest_start_date - 1.month
+
+    assert_not t.valid?
+    assert t.errors.key?(:start_date)
+  end
+
+  test "um template antigo continua podendo ser pausado e editado" do
+    t = template(day_of_month: 5)
+    t.update_columns(start_date: Date.current - 15.years, last_generated_on: Date.current) # já gerou tudo
+
+    assert t.update(active: false)
+    assert t.update(description: "Novo nome")
+    assert t.reload.valid?, "não valida de novo a data de início se ela não mudou"
+  end
+
+  test "recusa valor acima do máximo da coluna" do
+    t = @user.recurring_transactions.build(kind: :income, description: "X", amount: 10**12, day_of_month: 5,
+                                           start_date: Date.current.beginning_of_month)
+
+    assert_not t.valid?
+    assert t.errors.key?(:amount)
   end
 end

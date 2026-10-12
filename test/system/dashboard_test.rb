@@ -151,8 +151,11 @@ class DashboardTest < ApplicationSystemTestCase
     sign_in @user
     create_entry("expense", "Mercado", 40)
 
-    dismiss_confirm { find("#expensesList [data-action='delete']").click }
+    answer_confirm(accept: false)
+    find("#expensesList [data-action='delete']").click
 
+    wait_for_confirm
+    assert_equal [ 'Excluir "Mercado"?' ], confirm_questions
     assert_selector "#expensesList .entry-row", count: 1
     assert_equal 1, @user.transactions.expense.count
   end
@@ -162,9 +165,11 @@ class DashboardTest < ApplicationSystemTestCase
     create_entry("expense", "Mercado", 40)
     assert_money "#balanceValue", "60,00"
 
-    accept_confirm { find("#expensesList [data-action='delete']").click }
+    answer_confirm(accept: true)
+    find("#expensesList [data-action='delete']").click
 
     assert_text "Nenhuma despesa cadastrada ainda."
+    assert_equal [ 'Excluir "Mercado"?' ], confirm_questions
     assert_money "#balanceValue", "100,00"
     assert_equal 0, @user.transactions.count
   end
@@ -193,6 +198,51 @@ class DashboardTest < ApplicationSystemTestCase
     assert_text(/3 lançamentos gerados/)
   end
 
+  test "recorrência com início além de 120 meses mostra o erro no formulário" do
+    sign_in @user
+    open_form("income")
+    fill_in "entryDescription", with: "Antigo"
+    fill_in "entryAmount", with: "100"
+    check "entryRecurring"
+    fill_in "entryDayOfMonth", with: "5"
+    set_date("entryDate", Date.current - 15.years)
+    click_button "entrySubmit"
+
+    assert_selector "#modalAlert", text: /limite de retroação é de 120 meses/
+    assert_selector "#entryModal.open"
+    assert_equal 0, @user.recurring_transactions.count
+  end
+
+  test "os campos de recorrência começam ocultos e aparecem ao marcar a opção" do
+    sign_in @user
+    open_form("income")
+
+    assert_selector "#recurringFields", visible: :hidden
+    check "entryRecurring"
+    assert_selector "#recurringFields", visible: :visible
+    uncheck "entryRecurring"
+    assert_selector "#recurringFields", visible: :hidden
+  end
+
+  test "a opção de ativo só aparece ao editar uma recorrência" do
+    sign_in @user
+    create_recurring("income", "Salário mensal", 1000, day: 1, start: Date.current.beginning_of_month)
+
+    open_form("income")
+    assert_selector "#entryActiveWrapper", visible: :hidden # criar: oculto
+    find("[data-action='close-modal']").click
+
+    find("#recurringList [data-action='edit-recurring']").click
+    assert_selector "#entryActiveWrapper", visible: :visible # editar: visível
+  end
+
+  test "o cartão da carteira mostra a dica de estilo sem atributo inline" do
+    sign_in @user
+
+    assert_selector "#walletsGrid .wallet-card"
+    assert_equal 0, page.all("#walletsGrid [style]", visible: :all).size
+  end
+
   test "pausar e retomar a recorrência" do
     sign_in @user
     create_recurring("income", "Salário mensal", 1000, day: 1, start: Date.current.beginning_of_month)
@@ -211,9 +261,12 @@ class DashboardTest < ApplicationSystemTestCase
     create_recurring("income", "Salário mensal", 1000, day: 1, start: Date.current.beginning_of_month - 1.month)
     assert_selector "#incomesList .entry-row", count: 2
 
-    accept_confirm { find("#recurringList [data-action='delete-recurring']").click }
+    answer_confirm(accept: true)
+    find("#recurringList [data-action='delete-recurring']").click
 
     assert_no_selector "#recurringList .entry-row"
+    assert_match(/Excluir a recorrência "Salário mensal"\?/, confirm_questions.first)
+    assert_match(/lançamentos já gerados serão mantidos/, confirm_questions.first)
     assert_selector "#incomesList .entry-row", count: 2
     assert_money "#balanceValue", "2.100,00"
   end

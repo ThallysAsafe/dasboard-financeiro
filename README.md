@@ -76,6 +76,12 @@ curl -s localhost:3000/graphql -H 'Content-Type: application/json' \
 O logout e a troca de senha invalidam todos os tokens do usuário. Login e cadastro
 têm limite de tentativas (Rack::Attack). As mensagens de erro saem em pt-BR.
 
+### Carteira
+
+Cada usuário tem uma carteira, criada junto com a conta. No cartão do dashboard, **"Editar
+carteira"** altera o nome e o **saldo inicial** (pode ser negativo). O saldo atual é o saldo
+inicial mais as receitas e menos as despesas. Valores vão até R$ 99.999.999,99.
+
 ### Lançamentos recorrentes
 
 Ao criar uma receita ou despesa, marque **"Repetir todo mês"** e escolha o dia: isso

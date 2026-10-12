@@ -131,4 +131,18 @@ class RecurringGraphqlTest < ActiveSupport::TestCase
       assert_equal 0, users(:one).recurring_transactions.count
     end
   end
+
+  test "data de início além da janela de retroação volta em errors e não cria nada" do
+    antiga = (RecurringTransaction.earliest_start_date - 1.month).iso8601
+    payload = execute(CREATE, variables: {
+      "kind" => "INCOME", "description" => "Antigo", "amount" => 100.0,
+      "dayOfMonth" => 5, "startDate" => antiga
+    }).dig("data", "recurringTransactionCreate")
+
+    assert_nil payload["recurringTransaction"]
+    assert_equal 0, payload["generatedCount"]
+    assert_match(/limite de retroação é de 120 meses/, payload["errors"].join)
+    assert_equal 0, users(:one).recurring_transactions.count
+    assert_equal 0, users(:one).transactions.where(description: "Antigo").count
+  end
 end

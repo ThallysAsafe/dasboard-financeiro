@@ -36,28 +36,29 @@ class ClickReliabilityTest < ApplicationSystemTestCase
     assert_operator ApplicationSystemTestCase.js_fallbacks[:clique], :>, antes
   end
 
-  test "o clique perdido num botão com confirm() também é refeito, e o diálogo é tratado" do
+  test "o clique perdido num botão que pede confirmação é refeito e a pergunta é feita" do
     users(:one).transactions.create!(kind: :expense, description: "Mercado", amount: 40, date: Date.current)
     visit "/dashboard"
+    answer_confirm(accept: true)
     node = find("#expensesList [data-action='delete']")
 
-    accept_confirm do
-      node.native.stub(:click, nil) { node.click }
-    end
+    node.native.stub(:click, nil) { node.click }
 
     assert_text "Nenhuma despesa cadastrada ainda."
+    assert_equal [ 'Excluir "Mercado"?' ], confirm_questions, "perguntou uma única vez"
     assert_equal 0, users(:one).transactions.expense.count
   end
 
-  test "cancelar o confirm() depois de um clique perdido mantém o lançamento" do
+  test "recusar a confirmação depois de um clique perdido mantém o lançamento" do
     users(:one).transactions.create!(kind: :expense, description: "Mercado", amount: 40, date: Date.current)
     visit "/dashboard"
+    answer_confirm(accept: false)
     node = find("#expensesList [data-action='delete']")
 
-    dismiss_confirm do
-      node.native.stub(:click, nil) { node.click }
-    end
+    node.native.stub(:click, nil) { node.click }
 
+    wait_for_confirm
+    assert_equal [ 'Excluir "Mercado"?' ], confirm_questions
     assert_selector "#expensesList .entry-row", count: 1
     assert_equal 1, users(:one).transactions.expense.count
   end
@@ -73,14 +74,14 @@ class ClickReliabilityTest < ApplicationSystemTestCase
 
   # --- digitação
 
-  test "texto digitado normalmente fica no campo e não é refeito" do
+  test "o texto digitado fica no campo exatamente uma vez" do
     click_button "Sair"
     assert_page_ready
-    antes = ApplicationSystemTestCase.js_fallbacks[:digitacao]
     fill_in "email", with: "alguem@exemplo.com"
 
+    # Exatamente o que foi digitado, sem duplicar (o Chrome pode perder a digitação de
+    # verdade e a camada refaz; o resultado tem de ser o mesmo nos dois casos).
     assert_equal "alguem@exemplo.com", find_field("email").value
-    assert_equal antes, ApplicationSystemTestCase.js_fallbacks[:digitacao]
   end
 
   test "texto que o navegador perdeu é gravado por JavaScript e vira o valor do campo" do

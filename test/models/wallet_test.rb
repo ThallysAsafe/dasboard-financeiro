@@ -62,4 +62,28 @@ class WalletTest < ActiveSupport::TestCase
     wallet.initial_balance = nil
     assert_not wallet.valid?
   end
+
+  test "o saldo inicial respeita os limites da coluna, positivo e negativo" do
+    wallet = users(:one).wallet
+
+    [ ApplicationRecord::MAX_MONEY, -ApplicationRecord::MAX_MONEY, 0, -250.5 ].each do |valor|
+      wallet.initial_balance = valor
+      assert wallet.valid?, "#{valor} deveria ser aceito"
+    end
+
+    [ ApplicationRecord::MAX_MONEY + 1, -ApplicationRecord::MAX_MONEY - 1, 10**12 ].each do |valor|
+      wallet.initial_balance = valor
+      assert_not wallet.valid?, "#{valor} deveria ser recusado"
+      assert wallet.errors.key?(:initial_balance)
+    end
+  end
+
+  test "o saldo inicial máximo e mínimo cabem no banco" do
+    wallet = users(:one).wallet
+
+    [ ApplicationRecord::MAX_MONEY, -ApplicationRecord::MAX_MONEY ].each do |valor|
+      assert wallet.update(initial_balance: valor)
+      assert_equal valor, wallet.reload.initial_balance
+    end
+  end
 end

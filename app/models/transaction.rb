@@ -10,6 +10,7 @@ class Transaction < ApplicationRecord
   enum :kind, KINDS, validate: true
 
   validates :description, presence: true
-  validates :amount, presence: true, numericality: { greater_than: 0 }
+  validates :amount, presence: true,
+                     numericality: { greater_than: 0, less_than_or_equal_to: MAX_MONEY }
   validates :date, presence: true
 end

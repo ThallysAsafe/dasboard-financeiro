@@ -76,4 +76,20 @@ class TransactionTest < ActiveSupport::TestCase
 
     assert_raises(ActiveRecord::RecordNotUnique) { duplicate.save!(validate: false) }
   end
+
+  test "aceita o valor máximo da coluna e recusa acima dele (em vez de estourar no banco)" do
+    assert build(amount: ApplicationRecord::MAX_MONEY).valid?
+
+    acima = build(amount: ApplicationRecord::MAX_MONEY + 0.01)
+    assert_not acima.valid?
+    assert_match(/menor ou igual a 99999999\.99/, acima.errors[:amount].first)
+    assert_not build(amount: 10**12).valid?
+  end
+
+  test "o valor máximo realmente cabe no banco" do
+    t = build(amount: ApplicationRecord::MAX_MONEY)
+
+    assert t.save
+    assert_equal ApplicationRecord::MAX_MONEY, t.reload.amount
+  end
 end

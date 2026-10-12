@@ -1,0 +1,26 @@
+<div id="walletModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Editar carteira</h2>
+            <button type="button" class="modal-close" data-action="close-wallet-modal" aria-label="Fechar">&times;</button>
+        </div>
+
+        <div id="walletModalAlert" class="alert-message"></div>
+
+        <form id="walletForm">
+            <div class="form-group">
+                <label for="walletName">Nome</label>
+                <input type="text" id="walletName" maxlength="60" placeholder="Ex.: Nubank" required>
+            </div>
+
+            <div class="form-group">
+                <label for="walletInitialBalance">Saldo inicial (R$)</label>
+                <input type="number" id="walletInitialBalance" step="0.01" min="-99999999.99" max="99999999.99" placeholder="0,00" required>
+            </div>
+
+            <p class="field-hint">O saldo atual é este valor mais as receitas e menos as despesas.</p>
+
+            <button type="submit" id="walletSubmit" class="btn-primary">Salvar</button>
+        </form>
+    </div>
+</div>

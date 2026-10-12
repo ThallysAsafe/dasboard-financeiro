@@ -587,3 +587,19 @@ select {
     display: block;
     margin: 12px auto;
 }
+
+/* Estado inicial oculto. O JS mostra e esconde via element.style.display (CSSOM, que
+   a CSP permite); a classe só define o ponto de partida, sem atributo style inline. */
+.is-hidden {
+    display: none;
+}
+
+.wallet-hint {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 8px;
+}
+
+.wallet-actions {
+    margin-top: 12px;
+}
