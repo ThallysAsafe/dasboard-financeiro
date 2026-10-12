@@ -13,6 +13,7 @@ class GraphqlController < ApplicationController
     # Contexto do GraphQL com usuário autenticado via JWT
     context = {
       current_user: current_user,
+      ip: request.remote_ip,
     }
     
     result = AppSchema.execute(query, variables: variables, context: context, operation_name: operation_name)

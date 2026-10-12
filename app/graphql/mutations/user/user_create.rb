@@ -6,6 +6,8 @@ class Mutations::User::UserCreate < GraphQL::Schema::Mutation
   field :errors, [String], null: false
 
   def resolve(email:, password:)
+    raise GraphQL::ExecutionError, AuthThrottle::MESSAGE if AuthThrottle.exceeded?("signup/ip", context[:ip])
+
     user = User.new(email: email, password: password)
     if user.save
       { user: user, errors: [] }

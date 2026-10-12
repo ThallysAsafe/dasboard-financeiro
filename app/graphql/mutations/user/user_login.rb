@@ -11,6 +11,10 @@ module Mutations
       field :errors, [String], null: false
 
       def resolve(email:, password:)
+        if AuthThrottle.exceeded?("login/ip", context[:ip]) || AuthThrottle.exceeded?("login/email", email)
+          raise GraphQL::ExecutionError, AuthThrottle::MESSAGE
+        end
+
         user = ::User.find_by(email: email)
 
         if user&.authenticate(password)
