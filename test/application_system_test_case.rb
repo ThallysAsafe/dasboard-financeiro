@@ -24,7 +24,7 @@ module ReliableClick
     ApplicationSystemTestCase.js_fallbacks[:clique] += 1
     # Assíncrono (setTimeout) para o comando do driver voltar na hora: se o clique abrir
     # um confirm(), um clique síncrono ficaria bloqueado no diálogo, e o Capybara
-    # (accept_confirm) precisa assumir o diálogo, não o nosso script.
+    # eventual diálogo não bloqueie o comando do driver.
     begin
       driver.execute_script("const el = arguments[0]; setTimeout(() => el.click(), 0)", self)
     rescue Selenium::WebDriver::Error::StaleElementReferenceError,
@@ -119,8 +119,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     # sempre igual.
     options.add_argument("--host-resolver-rules=MAP fonts.googleapis.com 127.0.0.1,MAP fonts.gstatic.com 127.0.0.1")
     options.add_option("goog:loggingPrefs", { browser: "ALL" })
-    # Não cancelar um confirm() aberto quando o teste consulta a página; o Capybara
-    # trata os diálogos explicitamente (accept_confirm / dismiss_confirm).
+    # Não cancelar um diálogo aberto quando o teste consulta a página.
     options.unhandled_prompt_behavior = :ignore
   end
 
@@ -165,6 +164,29 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   def visit(*)
     super
     assert_page_ready
+  end
+
+  # O confirm() NATIVO não é confiável em Chrome headless: ele cancela o diálogo sozinho
+  # (devolve false em ~1 ms, medido) quando a chamada não vem de um clique real do usuário,
+  # o que acontece sempre que a camada de recuperação precisa refazer um clique perdido.
+  # Por isso os testes trocam window.confirm por uma função que registra a pergunta e
+  # devolve a resposta combinada. Continua provando o que importa: o app pergunta a coisa
+  # certa e age conforme a resposta. Chame depois de visitar a página (visit zera o stub).
+  def answer_confirm(accept:)
+    page.execute_script(<<~JS)
+      window.__confirmQuestions = [];
+      window.confirm = (message) => { window.__confirmQuestions.push(message); return #{accept ? "true" : "false"}; };
+    JS
+  end
+
+  def confirm_questions
+    page.evaluate_script("window.__confirmQuestions") || []
+  end
+
+  # Espera o app fazer a pergunta (útil quando a resposta é "não" e nada mais muda na tela).
+  def wait_for_confirm(timeout: Capybara.default_max_wait_time)
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+    sleep 0.05 while confirm_questions.empty? && Process.clock_gettime(Process::CLOCK_MONOTONIC) < deadline
   end
 
   # Valores saem como "R$ 1.050,00" com espaço não separável.

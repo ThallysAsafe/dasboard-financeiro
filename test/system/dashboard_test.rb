@@ -151,8 +151,11 @@ class DashboardTest < ApplicationSystemTestCase
     sign_in @user
     create_entry("expense", "Mercado", 40)
 
-    dismiss_confirm { find("#expensesList [data-action='delete']").click }
+    answer_confirm(accept: false)
+    find("#expensesList [data-action='delete']").click
 
+    wait_for_confirm
+    assert_equal [ 'Excluir "Mercado"?' ], confirm_questions
     assert_selector "#expensesList .entry-row", count: 1
     assert_equal 1, @user.transactions.expense.count
   end
@@ -162,9 +165,11 @@ class DashboardTest < ApplicationSystemTestCase
     create_entry("expense", "Mercado", 40)
     assert_money "#balanceValue", "60,00"
 
-    accept_confirm { find("#expensesList [data-action='delete']").click }
+    answer_confirm(accept: true)
+    find("#expensesList [data-action='delete']").click
 
     assert_text "Nenhuma despesa cadastrada ainda."
+    assert_equal [ 'Excluir "Mercado"?' ], confirm_questions
     assert_money "#balanceValue", "100,00"
     assert_equal 0, @user.transactions.count
   end
@@ -256,9 +261,12 @@ class DashboardTest < ApplicationSystemTestCase
     create_recurring("income", "Salário mensal", 1000, day: 1, start: Date.current.beginning_of_month - 1.month)
     assert_selector "#incomesList .entry-row", count: 2
 
-    accept_confirm { find("#recurringList [data-action='delete-recurring']").click }
+    answer_confirm(accept: true)
+    find("#recurringList [data-action='delete-recurring']").click
 
     assert_no_selector "#recurringList .entry-row"
+    assert_match(/Excluir a recorrência "Salário mensal"\?/, confirm_questions.first)
+    assert_match(/lançamentos já gerados serão mantidos/, confirm_questions.first)
     assert_selector "#incomesList .entry-row", count: 2
     assert_money "#balanceValue", "2.100,00"
   end
