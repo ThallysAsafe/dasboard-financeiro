@@ -25,6 +25,18 @@ RUN apt-get update -qq && \
     postgresql-client \
     && rm -rf /var/lib/apt/lists /var/cache/apt/archives
 
+# Google Chrome estável, o mesmo navegador do CI: alguns problemas dos testes de navegador
+# só aparecem nele (o Chromium do Debian se comporta diferente). A Google só distribui o
+# pacote para amd64; em outras arquiteturas fica só o Chromium acima.
+# Para rodar os testes de navegador com ele (como o CI):
+#   CHROME_BIN=/usr/bin/google-chrome bin/rails test:system   (sem CHROMEDRIVER_PATH)
+RUN if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
+      curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+      apt-get update -qq && \
+      apt-get install --no-install-recommends -y /tmp/chrome.deb && \
+      rm -rf /tmp/chrome.deb /var/lib/apt/lists /var/cache/apt/archives; \
+    fi
+
 # Set development environment
 ENV RAILS_ENV="development" \
     BUNDLE_PATH="/usr/local/bundle" \
