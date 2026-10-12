@@ -1,8 +1,9 @@
 # Política de segurança de conteúdo. JS e CSS das páginas são arquivos servidos
 # pelo próprio app ('self'). O único script inline é o do importmap, liberado por
 # nonce (um valor por resposta): um script injetado não tem o nonce e não executa.
-# Nem <style> nem handlers inline (onclick=...) são permitidos; a página usa
-# addEventListener.
+# Nem <style>, nem atributos style="...", nem handlers inline (onclick=...) são
+# permitidos: a página usa classes CSS e addEventListener. Mostrar/esconder via
+# element.style.display (CSSOM) continua valendo, a CSP não o bloqueia.
 Rails.application.configure do
   config.content_security_policy do |policy|
     policy.default_src :none
@@ -17,8 +18,6 @@ Rails.application.configure do
     # Google Fonts (a única origem externa usada pelas páginas).
     policy.style_src :self, "https://fonts.googleapis.com"
     policy.font_src :self, "https://fonts.gstatic.com"
-    # Atributos style="..." são só estilo; scripts continuam sob nonce.
-    policy.style_src_attr :unsafe_inline
   end
 
   config.content_security_policy_nonce_generator = ->(_request) { SecureRandom.base64(16) }

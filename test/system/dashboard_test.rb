@@ -208,6 +208,36 @@ class DashboardTest < ApplicationSystemTestCase
     assert_equal 0, @user.recurring_transactions.count
   end
 
+  test "os campos de recorrência começam ocultos e aparecem ao marcar a opção" do
+    sign_in @user
+    open_form("income")
+
+    assert_selector "#recurringFields", visible: :hidden
+    check "entryRecurring"
+    assert_selector "#recurringFields", visible: :visible
+    uncheck "entryRecurring"
+    assert_selector "#recurringFields", visible: :hidden
+  end
+
+  test "a opção de ativo só aparece ao editar uma recorrência" do
+    sign_in @user
+    create_recurring("income", "Salário mensal", 1000, day: 1, start: Date.current.beginning_of_month)
+
+    open_form("income")
+    assert_selector "#entryActiveWrapper", visible: :hidden # criar: oculto
+    find("[data-action='close-modal']").click
+
+    find("#recurringList [data-action='edit-recurring']").click
+    assert_selector "#entryActiveWrapper", visible: :visible # editar: visível
+  end
+
+  test "o cartão da carteira mostra a dica de estilo sem atributo inline" do
+    sign_in @user
+
+    assert_selector "#walletsGrid .wallet-card"
+    assert_equal 0, page.all("#walletsGrid [style]", visible: :all).size
+  end
+
   test "pausar e retomar a recorrência" do
     sign_in @user
     create_recurring("income", "Salário mensal", 1000, day: 1, start: Date.current.beginning_of_month)

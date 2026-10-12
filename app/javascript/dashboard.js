@@ -155,7 +155,7 @@ function renderWallets() {
         <div class="card wallet-card">
             <div class="wallet-name">${escapeHtml(wallet.name)}</div>
             <div class="wallet-balance">${formatCurrency(wallet.balance)}</div>
-            <div style="font-size: 12px; color: #94a3b8; margin-top: 8px;">
+            <div class="wallet-hint">
                 + ${formatCurrency(wallet.totalIncome)} | - ${formatCurrency(wallet.totalExpense)}
             </div>
         </div>

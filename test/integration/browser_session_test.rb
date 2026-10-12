@@ -179,7 +179,8 @@ class BrowserSessionTest < ActionDispatch::IntegrationTest
 
     assert_match(/'nonce-/, script_src)
     assert_no_match(/unsafe-inline|unsafe-eval/, script_src)
-    assert_no_match(/unsafe-inline/, csp[/style-src [^;]+/]) # style-src-attr é outra diretiva
+    assert_no_match(/unsafe-inline|unsafe-eval/, csp, "nenhuma diretiva abre exceção inline")
+    assert_no_match(/style-src-attr/, csp, "sem atributos style=, não há o que liberar")
     assert_match(/object-src 'none'/, csp)
     assert_match(/frame-ancestors 'none'/, csp)
 
@@ -227,6 +228,27 @@ class BrowserSessionTest < ActionDispatch::IntegrationTest
         get asset
         assert_response :ok, asset
       end
+    end
+  end
+
+  test "nenhuma página tem atributo style= (a CSP não os permite mais)" do
+    [ "/login", "/signup" ].each do |path|
+      get path
+      assert_no_match(/\sstyle\s*=/i, response.body, path)
+    end
+
+    login
+    get "/dashboard"
+    assert_no_match(/\sstyle\s*=/i, response.body, "/dashboard")
+  end
+
+  test "o JS não cria atributos style (setAttribute, cssText, HTML gerado com style=)" do
+    %w[dashboard login signup].each do |name|
+      source = Rails.root.join("app/javascript/#{name}.js").read
+
+      assert_no_match(/setAttribute\(\s*['"]style['"]/, source, "#{name}.js")
+      assert_no_match(/\.cssText/, source, "#{name}.js")
+      assert_no_match(/\sstyle\s*=\s*["']/, source, "#{name}.js")
     end
   end
 
