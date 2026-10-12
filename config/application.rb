@@ -33,7 +33,9 @@ module App
     # These settings can be overridden in specific environments using the files
     # in config/environments, which are processed later.
     #
-    # config.time_zone = "Central Time (US & Canada)"
+    # O app é usado no Brasil: "hoje" precisa ser o dia de Brasília. Em UTC, depois
+    # das 21h o servidor já estaria no dia seguinte e geraria recorrências futuras.
+    config.time_zone = "Brasilia"
     # config.eager_load_paths << Rails.root.join("extras")
   end
 end
