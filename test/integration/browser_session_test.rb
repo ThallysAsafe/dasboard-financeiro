@@ -190,7 +190,6 @@ class BrowserSessionTest < ActionDispatch::IntegrationTest
     pages << [ "/dashboard", response.body ]
 
     pages.each do |path, body|
-
       assert_no_match(/<style\b/, body, path)
       body.scan(%r{<script\b[^>]*>(.*?)</script>}m).flatten.each do |inline|
         assert_no_match(/function |=>|fetch\(/, inline, "#{path}: JS próprio inline")
