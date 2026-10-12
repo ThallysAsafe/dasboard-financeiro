@@ -163,6 +163,16 @@ class BrowserSessionTest < ActionDispatch::IntegrationTest
     assert_no_match(INLINE_HANDLER, response.body)
   end
 
+  test "as páginas de recuperação e confirmação não usam localStorage nem handlers inline" do
+    [ "/password/forgot", "/password/reset", "/email/confirm" ].each do |path|
+      get path
+
+      assert_response :ok, path
+      assert_no_match(/localStorage/, response.body, path)
+      assert_no_match(INLINE_HANDLER, response.body, path)
+    end
+  end
+
   test "o dashboard não usa localStorage nem handlers inline" do
     login
     get "/dashboard"
@@ -196,6 +206,10 @@ class BrowserSessionTest < ActionDispatch::IntegrationTest
     pages << [ "/login", response.body ]
     get "/signup"
     pages << [ "/signup", response.body ]
+    [ "/password/forgot", "/password/reset", "/email/confirm" ].each do |path|
+      get path
+      pages << [ path, response.body ]
+    end
     login
     get "/dashboard"
     pages << [ "/dashboard", response.body ]
@@ -214,6 +228,10 @@ class BrowserSessionTest < ActionDispatch::IntegrationTest
     pages["/login"] = [ response.body, "login", "login" ]
     get "/signup"
     pages["/signup"] = [ response.body, "login", "signup" ] # reaproveita o CSS do login
+    { "/password/forgot" => "forgot_password", "/password/reset" => "reset_password", "/email/confirm" => "confirm_email" }.each do |path, js|
+      get path
+      pages[path] = [ response.body, "login", js ]
+    end
     login
     get "/dashboard"
     pages["/dashboard"] = [ response.body, "dashboard", "dashboard" ]
@@ -243,7 +261,7 @@ class BrowserSessionTest < ActionDispatch::IntegrationTest
   end
 
   test "o JS não cria atributos style (setAttribute, cssText, HTML gerado com style=)" do
-    %w[dashboard login signup].each do |name|
+    %w[dashboard login signup forgot_password reset_password confirm_email].each do |name|
       source = Rails.root.join("app/javascript/#{name}.js").read
 
       assert_no_match(/setAttribute\(\s*['"]style['"]/, source, "#{name}.js")

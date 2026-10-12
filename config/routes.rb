@@ -16,6 +16,9 @@ Rails.application.routes.draw do
 
   get "/login", to: "sessions#new"
   get "/signup", to: "registrations#new"
+  get "/password/forgot", to: "passwords#forgot", as: :password_forgot
+  get "/password/reset", to: "passwords#reset", as: :password_reset
+  get "/email/confirm", to: "email_confirmations#show", as: :email_confirmation
   get "/dashboard", to: "dashboard#index"
   root to: "sessions#new"
 
@@ -26,6 +29,10 @@ Rails.application.routes.draw do
       # Rotas de autenticação (REST)
       post "auth/login", to: "auth#login"      # Login (grava o cookie de sessão)
       post "auth/signup", to: "auth#signup"    # Cadastro (cria o usuário e já abre a sessão)
+      post "auth/password/forgot", to: "auth#forgot_password"   # pede o e-mail de redefinição
+      post "auth/password/reset", to: "auth#reset_password"     # define a nova senha com o token
+      post "auth/email/confirm", to: "auth#confirm_email"       # confirma o e-mail com o token
+      post "auth/email/resend", to: "auth#resend_confirmation"  # reenvia a confirmação (logado)
       get "auth/me", to: "auth#me"             # Perfil do usuário autenticado
       post "auth/logout", to: "auth#logout"    # Logout
 

@@ -199,6 +199,8 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # vazio e deixa o teste instável (visto com o Chrome estável, em máquina ocupada).
   # As páginas marcam `body[data-ready]` quando estão prontas; esperar por esse sinal
   # é determinístico, ao contrário de dormir um tempo qualquer.
+  # Atenção: logo depois de um clique que navega, a página ANTIGA ainda tem data-ready.
+  # Confirme o caminho (assert_current_path) antes de chamar este método.
   def assert_page_ready
     assert_selector "body[data-ready='true']"
   end

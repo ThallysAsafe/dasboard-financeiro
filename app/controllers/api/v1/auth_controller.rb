@@ -10,7 +10,7 @@ module Api
 
       # Adiciona autenticação apenas para as actions que precisam
       include Authenticable
-      skip_before_action :authenticate_request!, only: [ :login, :signup ]
+      skip_before_action :authenticate_request!, only: [ :login, :signup, :forgot_password, :reset_password, :confirm_email ]
 
       # POST /api/v1/auth/login
       # Faz login e grava o token JWT em um cookie HttpOnly
@@ -70,6 +70,55 @@ module Api
         end
       end
 
+      # POST /api/v1/auth/password/forgot
+      # Pede o e-mail de redefinição. A resposta é SEMPRE a mesma, exista ou não a conta,
+      # para não revelar quem está cadastrado.
+      def forgot_password
+        user = User.find_by(email: params[:email])
+        UserMailer.password_reset(user).deliver_later if user
+
+        render json: { message: "Se existir uma conta com este e-mail, enviamos um link para redefinir a senha." }
+      end
+
+      # POST /api/v1/auth/password/reset
+      # Corpo: { "token": "...", "password": "...", "password_confirmation": "..." }
+      # O token vale uma vez só: trocar a senha o invalida, e também derruba as sessões abertas.
+      def reset_password
+        user = User.find_by_token_for(:password_reset, params[:token].to_s)
+        return render json: { error: "Link inválido ou expirado. Peça um novo." }, status: :unprocessable_entity unless user
+
+        user.password = params[:password]
+        user.password_confirmation = params[:password_confirmation].to_s
+        # has_secure_password ignora uma senha vazia (não troca nada), então sem esta checagem
+        # a resposta seria um sucesso falso
+        user.errors.add(:password, :blank) if params[:password].blank?
+
+        if user.errors.empty? && user.save
+          render json: { message: "Senha alterada. Entre com a nova senha." }
+        else
+          render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
+        end
+      end
+
+      # POST /api/v1/auth/email/confirm — Corpo: { "token": "..." }
+      def confirm_email
+        user = User.find_by_token_for(:email_confirmation, params[:token].to_s)
+        return render json: { error: "Link inválido ou expirado. Peça um novo no painel." }, status: :unprocessable_entity unless user
+
+        user.confirm_email!
+        render json: { message: "E-mail confirmado." }
+      end
+
+      # POST /api/v1/auth/email/resend (logado)
+      def resend_confirmation
+        if current_user.email_confirmed?
+          render json: { message: "Este e-mail já está confirmado." }
+        else
+          UserMailer.email_confirmation(current_user).deliver_later
+          render json: { message: "Enviamos um novo link para #{current_user.email}." }
+        end
+      end
+
       # GET /api/v1/auth/me
       # Retorna informações do usuário autenticado
       # Requer token JWT no header: Authorization: Bearer <token>
@@ -85,7 +134,8 @@ module Api
         render json: {
           user: {
             id: current_user.id,
-            email: current_user.email
+            email: current_user.email,
+            email_confirmed: current_user.email_confirmed?
           }
         }, status: :ok
       end

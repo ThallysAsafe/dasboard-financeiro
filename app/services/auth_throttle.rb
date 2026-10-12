@@ -9,7 +9,13 @@ module AuthThrottle
   LIMITS = {
     "login/ip" => [ 5, 1.minute ],
     "login/email" => [ 5, 1.minute ],
-    "signup/ip" => [ 5, 1.hour ]
+    "signup/ip" => [ 5, 1.hour ],
+    # e-mails: evitam usar o app para entupir a caixa de alguém ou adivinhar tokens
+    "password-forgot/ip" => [ 5, 1.hour ],
+    "password-forgot/email" => [ 3, 1.hour ],
+    "password-reset/ip" => [ 10, 1.hour ],
+    "email-confirm/ip" => [ 20, 1.hour ],
+    "email-resend/ip" => [ 5, 1.hour ]
   }.freeze
 
   MESSAGE = "Muitas tentativas. Tente novamente em instantes.".freeze

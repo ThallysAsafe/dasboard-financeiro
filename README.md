@@ -49,8 +49,8 @@ sistema, o rubocop, o brakeman e a auditoria de JS a cada PR.
 
 - **GraphQL** (`POST /graphql`): usuários, a carteira, receitas, despesas,
   recorrências e resumos financeiros. Tudo é escopado ao usuário autenticado.
-- **REST** (`/api/v1/auth/*`): só autenticação (`signup`, `login`, `me`, `logout`).
-- **Páginas** (`/signup`, `/login`, `/dashboard`): HTML servido pelo Rails que consome as duas
+- **REST** (`/api/v1/auth/*`): só autenticação (`signup`, `login`, `me`, `logout`, recuperar senha e confirmar e-mail).
+- **Páginas** (`/signup`, `/login`, `/dashboard`, `/password/forgot`, `/password/reset`, `/email/confirm`): HTML servido pelo Rails que consome as duas
   APIs pelo navegador.
 
 A arquitetura em detalhe (modelo de domínio, regras da recorrência, armadilhas de
@@ -75,6 +75,23 @@ curl -s localhost:3000/graphql -H 'Content-Type: application/json' \
 
 O logout e a troca de senha invalidam todos os tokens do usuário. Login e cadastro
 têm limite de tentativas (Rack::Attack). As mensagens de erro saem em pt-BR.
+
+### E-mail: recuperar senha e confirmar e-mail
+
+- **Esqueci minha senha** (link na tela de login): pede o e-mail, recebe um link que vale
+  30 minutos e **uma vez só**, escolhe a nova senha. A resposta é a mesma exista ou não a
+  conta, e trocar a senha derruba as sessões abertas.
+- **Confirmar e-mail:** o cadastro envia um link (vale 3 dias). Enquanto não confirma, o
+  painel mostra um aviso com "Reenviar e-mail"; ele não bloqueia o uso.
+- Os links usam tokens assinados pelo Rails, sem guardar nada no banco, e a confirmação e
+  a troca de senha só acontecem por POST (abrir o link não muda nada).
+
+**Em desenvolvimento nada é enviado de verdade:** o `docker compose up` sobe o **Mailpit**,
+uma caixa de entrada local. Abra http://localhost:8025 para ler os e-mails que o app mandou.
+
+Em produção qualquer provedor SMTP serve, só com variáveis de ambiente (veja o
+`.env.example`: `SMTP_ADDRESS`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`, `APP_HOST`),
+sem mudar o código.
 
 ### Carteira
 

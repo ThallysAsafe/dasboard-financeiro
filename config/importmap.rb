@@ -1,11 +1,9 @@
 # Pin npm packages by running ./bin/importmap
 
-pin "application"
-pin "@hotwired/turbo-rails", to: "turbo.min.js"
-pin "@hotwired/stimulus", to: "stimulus.min.js"
-pin "@hotwired/stimulus-loading", to: "stimulus-loading.js"
-pin_all_from "app/javascript/controllers", under: "controllers"
 # Páginas autocontidas (layout: false): um módulo por página.
 pin "dashboard"
 pin "login"
 pin "signup"
+pin "forgot_password"
+pin "reset_password"
+pin "confirm_email"

@@ -109,6 +109,7 @@ class ClickReliabilityTest < ApplicationSystemTestCase
 
   test "o texto digitado fica no campo exatamente uma vez" do
     click_button "Sair"
+    assert_current_path "/login" # só o caminho prova que trocou de página: a antiga também tem data-ready
     assert_page_ready
     fill_in "email", with: "alguem@exemplo.com"
 
@@ -119,6 +120,7 @@ class ClickReliabilityTest < ApplicationSystemTestCase
 
   test "texto que o navegador perdeu é gravado por JavaScript e vira o valor do campo" do
     click_button "Sair"
+    assert_current_path "/login" # só o caminho prova que trocou de página: a antiga também tem data-ready
     assert_page_ready
     campo = find_field("password")
     antes = ApplicationSystemTestCase.js_fallbacks[:digitacao]
@@ -131,6 +133,7 @@ class ClickReliabilityTest < ApplicationSystemTestCase
 
   test "login completo mesmo quando o navegador perde a digitação" do
     click_button "Sair"
+    assert_current_path "/login" # só o caminho prova que trocou de página: a antiga também tem data-ready
     assert_page_ready
     fill_in "email", with: users(:one).email
     campo = find_field("password")

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmar e-mail - Dashboard Financeiro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <%= stylesheet_link_tag "login" %>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>Confirmação de e-mail</h1>
+            <p id="statusText">Confirmando o seu e-mail...</p>
+        </div>
+
+        <div id="alertMessage" class="alert-message"></div>
+
+        <div class="signup-link">
+            <a href="/dashboard">Ir para o painel</a>
+        </div>
+    </div>
+
+    <%= javascript_importmap_tags "confirm_email" %>
+</body>
+</html>

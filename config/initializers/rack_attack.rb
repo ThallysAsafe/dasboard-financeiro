@@ -30,6 +30,24 @@ Rails.application.config.to_prepare do
     req.ip if req.post? && req.path == "/api/v1/auth/signup"
   end
 
+  # E-mails de recuperação/confirmação: por IP, e por e-mail para não entupir a caixa de
+  # uma pessoa (mesmo vindo de vários IPs).
+  post_to = ->(req, path) { req.post? && req.path == path }
+  {
+    "password-forgot/ip" => "/api/v1/auth/password/forgot",
+    "password-reset/ip" => "/api/v1/auth/password/reset",
+    "email-confirm/ip" => "/api/v1/auth/email/confirm",
+    "email-resend/ip" => "/api/v1/auth/email/resend"
+  }.each do |rule, path|
+    limit, period = AuthThrottle::LIMITS.fetch(rule)
+    Rack::Attack.throttle(rule, limit: limit, period: period) { |req| req.ip if post_to.call(req, path) }
+  end
+
+  limit, period = AuthThrottle::LIMITS.fetch("password-forgot/email")
+  Rack::Attack.throttle("password-forgot/email", limit: limit, period: period) do |req|
+    AuthThrottle.normalize(req.params["email"]).presence if post_to.call(req, "/api/v1/auth/password/forgot")
+  end
+
   Rack::Attack.throttled_responder = lambda do |_req|
     [ 429, { "Content-Type" => "application/json" }, [ { error: AuthThrottle::MESSAGE }.to_json ] ]
   end
