@@ -3,7 +3,7 @@ const DASHBOARD_QUERY = `
         balance
         totalIncome
         totalExpense
-        wallet { id name balance totalIncome totalExpense }
+        wallet { id name initialBalance balance totalIncome totalExpense }
         incomes: transactions(kind: INCOME, limit: $limit) { id description amount date category recurringTransactionId }
         expenses: transactions(kind: EXPENSE, limit: $limit) { id description amount date category recurringTransactionId }
         recurringIncomes: recurringTransactions(kind: INCOME) { id description amount dayOfMonth startDate endDate category active nextOccurrence }
@@ -28,7 +28,9 @@ const ACTIONS = {
     'load-more': (el) => loadMore(el.dataset.kind),
     'edit-recurring': (el) => openEditRecurring(el.dataset.kind, el.dataset.id),
     'toggle-recurring': (el) => toggleRecurringActive(el.dataset.kind, el.dataset.id),
-    'delete-recurring': (el) => deleteRecurring(el.dataset.kind, el.dataset.id)
+    'delete-recurring': (el) => deleteRecurring(el.dataset.kind, el.dataset.id),
+    'edit-wallet': () => openWalletModal(),
+    'close-wallet-modal': () => closeWalletModal()
 };
 
 function bindEvents() {
@@ -39,6 +41,8 @@ function bindEvents() {
     document.getElementById('entryModal').addEventListener('click', handleOverlayClick);
     document.getElementById('entryForm').addEventListener('submit', handleEntrySubmit);
     document.getElementById('entryRecurring').addEventListener('change', toggleRecurringFields);
+    document.getElementById('walletModal').addEventListener('click', handleWalletOverlayClick);
+    document.getElementById('walletForm').addEventListener('submit', handleWalletSubmit);
 }
 
 // O token fica num cookie HttpOnly: o JS não o lê. A sessão é verificada
@@ -78,7 +82,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') closeModal();
+    if (event.key === 'Escape') {
+        closeModal();
+        closeWalletModal();
+    }
 });
 
 // --- Comunicação ---
@@ -157,6 +164,9 @@ function renderWallets() {
             <div class="wallet-balance">${formatCurrency(wallet.balance)}</div>
             <div class="wallet-hint">
                 + ${formatCurrency(wallet.totalIncome)} | - ${formatCurrency(wallet.totalExpense)}
+            </div>
+            <div class="wallet-actions">
+                <button class="btn-icon" data-action="edit-wallet">Editar carteira</button>
             </div>
         </div>
     `).join('');
@@ -351,6 +361,75 @@ function closeModal() {
 
 function handleOverlayClick(event) {
     if (event.target === event.currentTarget) closeModal();
+}
+
+// --- Carteira ---
+
+function openWalletModal() {
+    const wallet = state.wallets[0];
+    if (!wallet) return;
+
+    hideWalletModalAlert();
+    document.getElementById('walletName').value = wallet.name;
+    document.getElementById('walletInitialBalance').value = wallet.initialBalance;
+    document.getElementById('walletModal').classList.add('open');
+    document.getElementById('walletName').focus();
+}
+
+function closeWalletModal() {
+    document.getElementById('walletModal').classList.remove('open');
+}
+
+function handleWalletOverlayClick(event) {
+    if (event.target === event.currentTarget) closeWalletModal();
+}
+
+async function handleWalletSubmit(event) {
+    event.preventDefault();
+
+    const button = document.getElementById('walletSubmit');
+    const originalLabel = button.textContent;
+    hideWalletModalAlert();
+    button.disabled = true;
+    button.textContent = 'Salvando...';
+
+    try {
+        const data = await graphqlRequest(
+            'mutation($name: String, $initialBalance: Float) { walletUpdate(name: $name, initialBalance: $initialBalance) { errors } }',
+            {
+                name: document.getElementById('walletName').value.trim(),
+                initialBalance: parseFloat(document.getElementById('walletInitialBalance').value)
+            }
+        );
+        const errors = data.walletUpdate.errors;
+
+        if (errors.length > 0) {
+            showWalletModalAlert(errors.join(' • '));
+            return;
+        }
+
+        closeWalletModal();
+        await loadDashboard();
+        showAlert('success', 'Carteira atualizada.');
+    } catch (error) {
+        showWalletModalAlert(error.message);
+    } finally {
+        button.disabled = false;
+        button.textContent = originalLabel;
+    }
+}
+
+function showWalletModalAlert(message) {
+    const box = document.getElementById('walletModalAlert');
+    box.textContent = message;
+    box.className = 'alert-message alert-error';
+    box.style.display = 'block';
+}
+
+function hideWalletModalAlert() {
+    const box = document.getElementById('walletModalAlert');
+    box.style.display = 'none';
+    box.className = 'alert-message';
 }
 
 // --- Escrita ---
