@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criar conta - Dashboard Financeiro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <%= stylesheet_link_tag "login" %>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>Criar conta</h1>
+            <p>Cadastre-se para começar a controlar suas finanças</p>
+        </div>
+
+        <div id="alertMessage" class="alert-message"></div>
+
+        <form id="signupForm" novalidate>
+            <div class="form-group">
+                <label for="email">E-mail</label>
+                <div class="input-wrapper">
+                    <input type="email" id="email" name="email" placeholder="seu@email.com" autocomplete="email" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Senha</label>
+                <div class="input-wrapper">
+                    <input type="password" id="password" name="password" placeholder="Mínimo de 10 caracteres" autocomplete="new-password" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="passwordConfirmation">Confirme a senha</label>
+                <div class="input-wrapper">
+                    <input type="password" id="passwordConfirmation" name="passwordConfirmation" placeholder="Repita a senha" autocomplete="new-password" required>
+                </div>
+            </div>
+
+            <button type="submit" id="btnSubmit" class="btn-login">Criar conta</button>
+        </form>
+
+        <div class="divider">
+            <span>ou</span>
+        </div>
+
+        <div class="signup-link">
+            Já tem uma conta? <a href="/login">Entrar</a>
+        </div>
+    </div>
+
+    <%= javascript_importmap_tags "signup" %>
+</body>
+</html>

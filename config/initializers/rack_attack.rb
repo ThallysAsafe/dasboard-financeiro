@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# Rate limiting da API REST de login. O login/cadastro via GraphQL é limitado
+# Rate limiting da API REST de login e cadastro. O login/cadastro via GraphQL é limitado
 # dentro das próprias mutations (ver AuthThrottle), já que o Rack::Attack só
 # enxerga o caminho e todo GraphQL é POST /graphql.
 #
@@ -22,6 +22,12 @@ Rails.application.config.to_prepare do
   Rack::Attack.throttle("login/email", limit: AuthThrottle::LIMITS["login/email"][0],
                                        period: AuthThrottle::LIMITS["login/email"][1]) do |req|
     AuthThrottle.normalize(req.params["email"]).presence if login.call(req)
+  end
+
+  # Cadastro: mesmo balde do userCreate do GraphQL (AuthThrottle "signup/ip").
+  Rack::Attack.throttle("signup/ip", limit: AuthThrottle::LIMITS["signup/ip"][0],
+                                     period: AuthThrottle::LIMITS["signup/ip"][1]) do |req|
+    req.ip if req.post? && req.path == "/api/v1/auth/signup"
   end
 
   Rack::Attack.throttled_responder = lambda do |_req|

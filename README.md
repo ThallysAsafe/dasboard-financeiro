@@ -15,8 +15,11 @@ docker compose up           # app em http://localhost:3000 + Postgres
 docker compose exec app bin/rails db:prepare
 ```
 
-Abra `http://localhost:3000/login`. Ainda não há tela de cadastro: crie o primeiro
-usuário pelo console (a senha precisa ter 10+ caracteres; a carteira dele é criada junto):
+Abra `http://localhost:3000/signup` e crie sua conta (senha com 10+ caracteres): a
+carteira é criada junto e você já entra no dashboard. Depois é só usar
+`http://localhost:3000/login`.
+
+Também dá para criar pelo console:
 
 ```bash
 docker compose exec app bin/rails console
@@ -42,8 +45,8 @@ O CI (`.github/workflows/ci.yml`) roda esses quatro a cada PR.
 
 - **GraphQL** (`POST /graphql`): usuários, a carteira, receitas, despesas,
   recorrências e resumos financeiros. Tudo é escopado ao usuário autenticado.
-- **REST** (`/api/v1/auth/*`): só autenticação (`login`, `me`, `logout`).
-- **Páginas** (`/login`, `/dashboard`): HTML servido pelo Rails que consome as duas
+- **REST** (`/api/v1/auth/*`): só autenticação (`signup`, `login`, `me`, `logout`).
+- **Páginas** (`/signup`, `/login`, `/dashboard`): HTML servido pelo Rails que consome as duas
   APIs pelo navegador.
 
 A arquitetura em detalhe (modelo de domínio, regras da recorrência, armadilhas de
@@ -67,7 +70,7 @@ curl -s localhost:3000/graphql -H 'Content-Type: application/json' \
 ```
 
 O logout e a troca de senha invalidam todos os tokens do usuário. Login e cadastro
-têm limite de tentativas (Rack::Attack).
+têm limite de tentativas (Rack::Attack). As mensagens de erro saem em pt-BR.
 
 ### Lançamentos recorrentes
 

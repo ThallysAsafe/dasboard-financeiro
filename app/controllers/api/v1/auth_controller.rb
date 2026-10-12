@@ -10,7 +10,7 @@ module Api
 
       # Adiciona autenticação apenas para as actions que precisam
       include Authenticable
-      skip_before_action :authenticate_request!, only: [ :login ]
+      skip_before_action :authenticate_request!, only: [ :login, :signup ]
 
       # POST /api/v1/auth/login
       # Faz login e grava o token JWT em um cookie HttpOnly
@@ -45,6 +45,28 @@ module Api
           }, status: :ok
         else
           render json: { error: "Email ou senha inválidos" }, status: :unauthorized
+        end
+      end
+
+      # POST /api/v1/auth/signup
+      # Cria o usuário (a carteira nasce junto) e já abre a sessão pelo cookie.
+      #
+      # Corpo: { "email": "...", "password": "...", "password_confirmation": "..." }
+      # Sucesso (201): { "user": { "id": 1, "email": "..." } }
+      # Falha (422):   { "errors": [ "E-mail já está em uso", ... ] }
+      def signup
+        user = User.new(
+          email: params[:email],
+          password: params[:password],
+          # to_s: sem a confirmação o has_secure_password não a validaria
+          password_confirmation: params[:password_confirmation].to_s
+        )
+
+        if user.save
+          set_auth_cookie(user)
+          render json: { user: { id: user.id, email: user.email } }, status: :created
+        else
+          render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
         end
       end
 

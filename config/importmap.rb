@@ -8,3 +8,4 @@ pin_all_from "app/javascript/controllers", under: "controllers"
 # Páginas autocontidas (layout: false): um módulo por página.
 pin "dashboard"
 pin "login"
+pin "signup"

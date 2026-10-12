@@ -155,6 +155,14 @@ class BrowserSessionTest < ActionDispatch::IntegrationTest
     assert_no_match(INLINE_HANDLER, response.body)
   end
 
+  test "a página de cadastro não usa localStorage nem handlers inline" do
+    get "/signup"
+
+    assert_response :ok
+    assert_no_match(/localStorage/, response.body)
+    assert_no_match(INLINE_HANDLER, response.body)
+  end
+
   test "o dashboard não usa localStorage nem handlers inline" do
     login
     get "/dashboard"
@@ -185,6 +193,8 @@ class BrowserSessionTest < ActionDispatch::IntegrationTest
     pages = []
     get "/login" # sem sessão: com sessão ele redireciona para o dashboard
     pages << [ "/login", response.body ]
+    get "/signup"
+    pages << [ "/signup", response.body ]
     login
     get "/dashboard"
     pages << [ "/dashboard", response.body ]
@@ -198,19 +208,21 @@ class BrowserSessionTest < ActionDispatch::IntegrationTest
   end
 
   test "o CSS e o JS de cada página são servidos como assets" do
-    bodies = {}
+    pages = {} # página => [corpo, nome do css, nome do js]
     get "/login"
-    bodies["login"] = response.body
+    pages["/login"] = [ response.body, "login", "login" ]
+    get "/signup"
+    pages["/signup"] = [ response.body, "login", "signup" ] # reaproveita o CSS do login
     login
     get "/dashboard"
-    bodies["dashboard"] = response.body
+    pages["/dashboard"] = [ response.body, "dashboard", "dashboard" ]
 
-    bodies.each do |name, body|
-      css = body[%r{href="(/assets/#{name}-[^"]+\.css)"}, 1]
-      js = body[%r{(/assets/#{name}-[^"]+\.js)}, 1]
+    pages.each do |path, (body, css_name, js_name)|
+      css = body[%r{href="(/assets/#{css_name}-[^"]+\.css)"}, 1]
+      js = body[%r{(/assets/#{js_name}-[^"]+\.js)}, 1]
 
-      assert css, "#{name} deveria linkar #{name}.css"
-      assert js, "#{name} deveria referenciar #{name}.js"
+      assert css, "#{path} deveria linkar #{css_name}.css"
+      assert js, "#{path} deveria referenciar #{js_name}.js"
       [ css, js ].each do |asset|
         get asset
         assert_response :ok, asset

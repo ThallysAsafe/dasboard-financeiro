@@ -1,0 +1,36 @@
+# Nomes dos atributos usados nas mensagens de validação (as frases em si vêm da
+# gem rails-i18n). Sem isto, apareceria "Password é muito curto".
+pt-BR:
+  activerecord:
+    models:
+      user: Usuário
+      wallet: Carteira
+      transaction: Lançamento
+      recurring_transaction: Recorrência
+    attributes:
+      user:
+        email: E-mail
+        password: Senha
+        password_confirmation: Confirmação da senha
+      wallet:
+        user: Usuário
+        name: Nome
+        initial_balance: Saldo inicial
+      transaction:
+        user: Usuário
+        description: Descrição
+        amount: Valor
+        date: Data
+        category: Categoria
+        kind: Tipo
+        wallet: Carteira
+      recurring_transaction:
+        user: Usuário
+        description: Descrição
+        amount: Valor
+        day_of_month: Dia do mês
+        start_date: Data de início
+        end_date: Data final
+        category: Categoria
+        kind: Tipo
+        wallet: Carteira

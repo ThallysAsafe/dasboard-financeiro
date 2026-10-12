@@ -15,6 +15,7 @@ Rails.application.routes.draw do
 
 
   get "/login", to: "sessions#new"
+  get "/signup", to: "registrations#new"
   get "/dashboard", to: "dashboard#index"
   root to: "sessions#new"
 
@@ -23,7 +24,8 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       # Rotas de autenticação (REST)
-      post "auth/login", to: "auth#login"      # Login (retorna token JWT)
+      post "auth/login", to: "auth#login"      # Login (grava o cookie de sessão)
+      post "auth/signup", to: "auth#signup"    # Cadastro (cria o usuário e já abre a sessão)
       get "auth/me", to: "auth#me"             # Perfil do usuário autenticado
       post "auth/logout", to: "auth#logout"    # Logout
 

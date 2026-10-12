@@ -40,6 +40,9 @@ gem "rack-attack"
 # Fila de jobs e scheduler (cron) no próprio Postgres, sem Redis nem processo extra
 gem "good_job"
 
+# Traduções do Rails (mensagens de validação etc.) para pt-BR
+gem "rails-i18n", "~> 7.0"
+
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 

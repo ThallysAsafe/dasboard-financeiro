@@ -36,6 +36,7 @@ module App
     # O app é usado no Brasil: "hoje" precisa ser o dia de Brasília. Em UTC, depois
     # das 21h o servidor já estaria no dia seguinte e geraria recorrências futuras.
     config.time_zone = "Brasilia"
+    config.i18n.default_locale = :"pt-BR"
     # config.eager_load_paths << Rails.root.join("extras")
 
     # Jobs e agendamento com GoodJob (fila no próprio Postgres). O modo async roda
