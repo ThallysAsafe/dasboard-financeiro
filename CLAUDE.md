@@ -34,13 +34,17 @@ CI (`.github/workflows/ci.yml`) runs brakeman, importmap audit, rubocop, and tes
 
 ### Two APIs, one auth scheme
 
-- **REST (`/api/v1/auth/*`)** — authentication only: `login` (returns a JWT), `me`, `logout`. Controller: `app/controllers/api/v1/auth_controller.rb`.
+- **REST (`/api/v1/auth/*`)** — authentication only: `login` (sets the JWT in an HttpOnly cookie), `me`, `logout` (revokes every token of the user). Controller: `app/controllers/api/v1/auth_controller.rb`.
 - **GraphQL (`POST /graphql`)** — everything else: users, wallets, incomes, expenses CRUD plus financial summaries. GraphiQL is mounted at `/graphiql` in development.
 
-JWT flow: `JsonWebToken` concern (`app/controllers/concerns/json_web_token.rb`) encodes/decodes tokens signed with `secret_key_base`, 24h expiry, payload `{ user_id: }`. Two consumers:
+JWT flow: `JsonWebToken` (`app/controllers/concerns/json_web_token.rb`) signs tokens with `secret_key_base` (HS256 pinned on verification), 24h expiry, payload `{ user_id:, tv: }`. `tv` is `users.token_version`: `JsonWebToken.user_for` rejects a token whose `tv` no longer matches, so `User#revoke_tokens!` (logout) and a password change invalidate every token already issued. `user_for` is the single entry point for both consumers:
 
-- REST controllers include the `Authenticable` concern (`before_action :authenticate_request!`, sets `@current_user`, renders 401 on failure).
-- `GraphqlController` resolves the user itself from the `Authorization: Bearer <token>` header and passes it as `context[:current_user]`; a missing/invalid token is not an error at the transport level — resolvers enforce auth individually via `require_user!` (in `QueryType`) or an inline `raise GraphQL::ExecutionError` check (in mutations).
+- REST controllers include `Authenticable` (`before_action :authenticate_request!`, sets `@current_user`, renders 401 on failure).
+- `GraphqlController` resolves the user itself and passes it as `context[:current_user]` (plus `ip`); a missing/invalid token is not an error at the transport level — resolvers enforce auth individually via `require_user!` (in `QueryType`) or an inline `raise GraphQL::ExecutionError` check (in mutations).
+
+Both get the token from `TokenAuthentication`: `Authorization: Bearer` for API clients, or the `auth_token` cookie (HttpOnly, SameSite=Strict, Secure under SSL) for the browser. **The cookie only counts on requests carrying `X-Requested-With: XMLHttpRequest`** — that header is the CSRF defense (cross-site requests can't send it without a CORS preflight, and CORS is not enabled). Any new browser `fetch` to the API must send it. Page navigations (`dashboard#index`, `sessions#new`) read the cookie directly via `find_user_from_cookie` and redirect server-side. REST login does not return the token in the body; non-browser clients get a Bearer token from the GraphQL `userLogin` mutation.
+
+Brute force: `AuthThrottle` + Rack::Attack limit login (5/min per IP and per e-mail) and signup (5/h per IP). REST is throttled by the middleware; GraphQL mutations call `AuthThrottle.exceeded?` themselves, since all GraphQL is `POST /graphql`.
 
 ### GraphQL layout
 
@@ -68,7 +72,9 @@ Generation is triggered by the `syncRecurringEntries` mutation (plus implicitly 
 
 ### Frontend
 
-Server-rendered pages that behave like a static SPA: `sessions#new` and `dashboard#index` are self-contained HTML documents rendered with `layout: false`, using inline CSS and vanilla JS. The browser stores the JWT and user in `localStorage` after login and calls `/graphql` with `fetch` + `Authorization: Bearer` header. There is no server-side session; page auth is enforced client-side by JS redirecting to `/login` when no token exists.
+Server-rendered pages that behave like a static SPA: `sessions#new` and `dashboard#index` are self-contained HTML documents rendered with `layout: false`, using inline CSS and vanilla JS. Auth is a server-side concern: the dashboard redirects to `/login` without a valid cookie, and the JS never sees the token (nothing in `localStorage`); it asks `/api/v1/auth/me` for the user and calls `/graphql` with `fetch` + `X-Requested-With`.
+
+A strict CSP (`config/initializers/content_security_policy.rb`) allows scripts only by per-response nonce, so inline `<script>`/`<style>` tags need `nonce="<%= content_security_policy_nonce %>"` and **inline event handlers (`onclick=` etc.) do not work**: elements declare `data-action` and a single delegated click listener (`ACTIONS` in `_scripts.js.erb`) dispatches. A test fails if a page reintroduces a handler attribute or `localStorage`.
 
 The dashboard is split into partials: `_styles.css.erb`, `_scripts.js.erb` and `_entry_modal.html.erb`. The first two are deliberately **not** `.html.erb` — development has `annotate_rendered_view_with_filenames` enabled, and the `<!-- BEGIN ... -->` comment Rails injects into an HTML partial would, inside a `<script>` block, act as a JS line comment and silently break the first line of code. They are rendered with `raw render(partial: ..., formats: [:js])`.
 

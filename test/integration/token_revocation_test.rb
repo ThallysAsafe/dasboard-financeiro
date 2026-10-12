@@ -68,9 +68,9 @@ class TokenRevocationTest < ActionDispatch::IntegrationTest
     assert_response :ok
   end
 
-  test "login emite um token que funciona logo em seguida" do
+  test "login grava o cookie de sessão e ele funciona logo em seguida" do
     post "/api/v1/auth/login", params: { email: "um@exemplo.com", password: "123456" }
-    me(response.parsed_body["token"])
+    get "/api/v1/auth/me", headers: { "X-Requested-With" => "XMLHttpRequest" }
     assert_response :ok
   end
 

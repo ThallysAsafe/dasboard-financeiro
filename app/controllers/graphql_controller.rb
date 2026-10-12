@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class GraphqlController < ApplicationController
+  include TokenAuthentication
+
   # Se estiver acessando de fora do domínio, nullify a session
   # Isso permite acesso externo à API e previne ataques CSRF
   skip_before_action :verify_authenticity_token
@@ -29,17 +31,6 @@ class GraphqlController < ApplicationController
   # Se não houver token ou for inválido, retorna nil (GraphQL permitirá queries públicas)
   def current_user
     @current_user ||= find_user_from_token
-  end
-
-  # Extrai o token do header Authorization
-  # Formato esperado: "Authorization: Bearer <token>"
-  def token_from_request_headers
-    request.headers["Authorization"]&.split(" ")&.last
-  end
-
-  # Busca o usuário a partir do token JWT (nil se ausente, inválido ou revogado)
-  def find_user_from_token
-    JsonWebToken.user_for(token_from_request_headers)
   end
 
   # Handle variables in form data, JSON body, or a blank value

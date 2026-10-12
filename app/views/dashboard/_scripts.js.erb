@@ -11,27 +11,53 @@ const DASHBOARD_QUERY = `
     }
 `;
 
+// O cookie de sessão só vale em requisições com este cabeçalho (defesa contra CSRF).
+const AJAX_HEADERS = { 'X-Requested-With': 'XMLHttpRequest' };
 const PAGE_SIZE = 100;
 const state = { wallets: [], incomes: [], expenses: [], recurring: [], hasMore: { income: false, expense: false } };
 let modalState = { kind: 'income', mode: 'create', id: null, recurring: false };
 
-document.addEventListener('DOMContentLoaded', async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-        window.location.href = '/login';
-        return;
-    }
+// Sem handlers inline (a CSP os bloqueia): cada elemento interativo declara
+// data-action e o clique é despachado aqui.
+const ACTIONS = {
+    'logout': () => handleLogout(),
+    'open-create': (el) => openCreate(el.dataset.kind),
+    'close-modal': () => closeModal(),
+    'edit': (el) => openEdit(el.dataset.kind, el.dataset.id),
+    'delete': (el) => deleteEntry(el.dataset.kind, el.dataset.id),
+    'load-more': (el) => loadMore(el.dataset.kind),
+    'edit-recurring': (el) => openEditRecurring(el.dataset.kind, el.dataset.id),
+    'toggle-recurring': (el) => toggleRecurringActive(el.dataset.kind, el.dataset.id),
+    'delete-recurring': (el) => deleteRecurring(el.dataset.kind, el.dataset.id)
+};
 
-    const userJson = localStorage.getItem('user');
-    let email = 'Usuário Autenticado';
-    if (userJson) {
-        try {
-            email = JSON.parse(userJson).email || email;
-        } catch (e) {
-            // localStorage corrompido: segue com o rótulo genérico.
-        }
+function bindEvents() {
+    document.addEventListener('click', (event) => {
+        const el = event.target.closest('[data-action]');
+        if (el && ACTIONS[el.dataset.action]) ACTIONS[el.dataset.action](el);
+    });
+    document.getElementById('entryModal').addEventListener('click', handleOverlayClick);
+    document.getElementById('entryForm').addEventListener('submit', handleEntrySubmit);
+    document.getElementById('entryRecurring').addEventListener('change', toggleRecurringFields);
+}
+
+// O token fica num cookie HttpOnly: o JS não o lê. A sessão é verificada
+// perguntando ao servidor quem é o usuário.
+async function loadCurrentUser() {
+    const response = await fetch('/api/v1/auth/me', { headers: AJAX_HEADERS });
+    if (response.status === 401) {
+        window.location.href = '/login';
+        return false;
     }
-    document.getElementById('userEmailDisplay').textContent = email;
+    const data = await response.json();
+    document.getElementById('userEmailDisplay').textContent = data.user.email;
+    return true;
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    bindEvents();
+
+    if (!(await loadCurrentUser())) return;
 
     // Falha de sincronização não pode derrubar a página: no pior caso as listas
     // ficam sem os lançamentos recorrentes mais recentes.
@@ -58,7 +84,7 @@ async function graphqlRequest(query, variables = {}) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            ...AJAX_HEADERS
         },
         body: JSON.stringify({ query, variables })
     });
@@ -156,13 +182,13 @@ function renderEntries(kind) {
                     ${isIncome ? '+' : '-'} ${formatCurrency(entry.amount)}
                 </div>
                 <div class="entry-actions">
-                    <button class="btn-icon" onclick="openEdit('${kind}', '${entry.id}')">Editar</button>
-                    <button class="btn-icon danger" onclick="deleteEntry('${kind}', '${entry.id}')">Excluir</button>
+                    <button class="btn-icon" data-action="edit" data-kind="${kind}" data-id="${entry.id}">Editar</button>
+                    <button class="btn-icon danger" data-action="delete" data-kind="${kind}" data-id="${entry.id}">Excluir</button>
                 </div>
             </div>
         `;
     }).join('') + (state.hasMore[kind]
-        ? `<button class="btn-icon" style="margin:12px auto;display:block" onclick="loadMore('${kind}')">Carregar mais</button>`
+        ? `<button class="btn-icon btn-load-more" data-action="load-more" data-kind="${kind}">Carregar mais</button>`
         : '');
 }
 
@@ -208,9 +234,9 @@ function renderRecurring() {
                 ${formatCurrency(template.amount)}
             </div>
             <div class="entry-actions">
-                <button class="btn-icon" onclick="openEditRecurring('${template.kind}', '${template.id}')">Editar</button>
-                <button class="btn-icon" onclick="toggleRecurringActive('${template.kind}', '${template.id}')">${template.active ? 'Pausar' : 'Retomar'}</button>
-                <button class="btn-icon danger" onclick="deleteRecurring('${template.kind}', '${template.id}')">Excluir</button>
+                <button class="btn-icon" data-action="edit-recurring" data-kind="${template.kind}" data-id="${template.id}">Editar</button>
+                <button class="btn-icon" data-action="toggle-recurring" data-kind="${template.kind}" data-id="${template.id}">${template.active ? 'Pausar' : 'Retomar'}</button>
+                <button class="btn-icon danger" data-action="delete-recurring" data-kind="${template.kind}" data-id="${template.id}">Excluir</button>
             </div>
         </div>
     `).join('');
@@ -552,14 +578,10 @@ function hideModalAlert() {
 }
 
 async function handleLogout() {
-    // Revoga o token no servidor; se a chamada falhar, o logout local segue.
+    // Revoga a sessão no servidor (que também apaga o cookie); se a chamada
+    // falhar, segue para o login do mesmo jeito.
     try {
-        await fetch('/api/v1/auth/logout', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-    } catch (e) { /* sem rede: ainda assim descarta o token local */ }
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+        await fetch('/api/v1/auth/logout', { method: 'POST', headers: AJAX_HEADERS });
+    } catch (e) { /* sem rede */ }
     window.location.href = '/login';
 }

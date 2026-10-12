@@ -10,7 +10,7 @@
     <%# Partials em .css/.js e não .html: em desenvolvimento o Rails anota cada
         partial HTML com <!-- BEGIN ... -->, e dentro de <script> o <!-- inicia
         um comentário de linha, o que comentaria a primeira linha do código. %>
-    <style>
+    <style nonce="<%= content_security_policy_nonce %>">
 <%= raw render(partial: "styles", formats: [ :css ]) %>
     </style>
 </head>
@@ -19,7 +19,7 @@
         <div class="navbar-brand">Dashboard Financeiro</div>
         <div class="user-info">
             <span id="userEmailDisplay" class="user-email">Carregando...</span>
-            <button onclick="handleLogout()" class="btn-logout">Sair</button>
+            <button data-action="logout" class="btn-logout">Sair</button>
         </div>
     </nav>
 
@@ -28,8 +28,8 @@
             <h1>Painel Principal</h1>
             <p>Resumo financeiro e carteiras carregadas em tempo real via GraphQL.</p>
             <div class="actions-bar">
-                <button class="btn-income" onclick="openCreate('income')">+ Nova Receita</button>
-                <button class="btn-expense" onclick="openCreate('expense')">+ Nova Despesa</button>
+                <button class="btn-income" data-action="open-create" data-kind="income">+ Nova Receita</button>
+                <button class="btn-expense" data-action="open-create" data-kind="expense">+ Nova Despesa</button>
             </div>
         </div>
 
@@ -62,7 +62,7 @@
 
         <div class="section-header">
             <h2 class="section-title">Receitas</h2>
-            <button class="btn-income" onclick="openCreate('income')">+ Nova Receita</button>
+            <button class="btn-income" data-action="open-create" data-kind="income">+ Nova Receita</button>
         </div>
         <div id="incomesList" class="entry-list">
             <div class="empty-state">Carregando...</div>
@@ -70,7 +70,7 @@
 
         <div class="section-header">
             <h2 class="section-title">Despesas</h2>
-            <button class="btn-expense" onclick="openCreate('expense')">+ Nova Despesa</button>
+            <button class="btn-expense" data-action="open-create" data-kind="expense">+ Nova Despesa</button>
         </div>
         <div id="expensesList" class="entry-list">
             <div class="empty-state">Carregando...</div>
@@ -86,7 +86,7 @@
 
     <%= render "entry_modal" %>
 
-    <script>
+    <script nonce="<%= content_security_policy_nonce %>">
 <%= raw render(partial: "scripts", formats: [ :js ]) %>
     </script>
 </body>

@@ -1,13 +1,13 @@
-<div id="entryModal" class="modal-overlay" onclick="handleOverlayClick(event)">
+<div id="entryModal" class="modal-overlay">
     <div class="modal">
         <div class="modal-header">
             <h2 id="modalTitle">Nova Receita</h2>
-            <button type="button" class="modal-close" onclick="closeModal()" aria-label="Fechar">&times;</button>
+            <button type="button" class="modal-close" data-action="close-modal" aria-label="Fechar">&times;</button>
         </div>
 
         <div id="modalAlert" class="alert-message"></div>
 
-        <form id="entryForm" onsubmit="handleEntrySubmit(event)">
+        <form id="entryForm">
             <div class="form-group">
                 <label for="entryDescription">Descrição</label>
                 <input type="text" id="entryDescription" placeholder="Ex.: Salário" required>
@@ -38,7 +38,7 @@
             </div>
 
             <div class="form-check">
-                <input type="checkbox" id="entryRecurring" onchange="toggleRecurringFields()">
+                <input type="checkbox" id="entryRecurring">
                 <label for="entryRecurring">Repetir todo mês</label>
             </div>
 

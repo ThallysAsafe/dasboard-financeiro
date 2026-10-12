@@ -13,7 +13,7 @@ module Api
       skip_before_action :authenticate_request!, only: [ :login ]
 
       # POST /api/v1/auth/login
-      # Faz login e retorna um token JWT
+      # Faz login e grava o token JWT em um cookie HttpOnly
       #
       # Corpo da requisição:
       # {
@@ -21,24 +21,24 @@ module Api
       #   "password": "senha123"
       # }
       #
-      # Resposta de sucesso (200):
+      # Resposta de sucesso (200): o token vai num cookie HttpOnly (o JS do
+      # navegador não o enxerga) e o corpo traz só o usuário:
       # {
-      #   "token": "eyJhbGciOiJIUzI1NiJ9...",
       #   "user": {
       #     "id": 1,
       #     "email": "usuario@exemplo.com"
       #   }
       # }
+      # Clientes que não são navegador obtêm um token Bearer pela mutation
+      # GraphQL `userLogin`.
       def login
         user = User.find_by(email: params[:email])
 
         # Valida se o usuário existe e a senha está correta
         if user&.authenticate(params[:password])
-          # Gera o token JWT com o ID do usuário
-          token = JsonWebToken.issue_for(user)
+          set_auth_cookie(user)
 
           render json: {
-            token: token,
             user: {
               id: user.id,
               email: user.email
@@ -80,6 +80,7 @@ module Api
         # Invalida todos os tokens do usuário incrementando a versão que eles
         # carregam; o cliente ainda deve descartar o token localmente.
         current_user.revoke_tokens!
+        clear_auth_cookie
         render json: { message: "Logout realizado com sucesso" }, status: :ok
       end
     end

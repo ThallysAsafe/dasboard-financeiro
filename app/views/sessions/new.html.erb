@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
+    <style nonce="<%= content_security_policy_nonce %>">
         * {
             margin: 0;
             padding: 0;
@@ -245,7 +245,7 @@
 
         <div id="alertMessage" class="alert-message"></div>
 
-        <form id="loginForm" onsubmit="handleLogin(event)">
+        <form id="loginForm">
             <div class="form-group">
                 <label for="email">Email</label>
                 <div class="input-wrapper">
@@ -288,7 +288,7 @@
         </div>
     </div>
 
-    <script>
+    <script nonce="<%= content_security_policy_nonce %>">
         async function handleLogin(event) {
             event.preventDefault();
             
@@ -320,15 +320,11 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    // Armazena o token JWT no localStorage
-                    localStorage.setItem('token', data.token);
-                    localStorage.setItem('user', JSON.stringify(data.user));
-
+                    // O token JWT vem num cookie HttpOnly gravado pelo servidor;
+                    // o JS da página nunca o vê.
                     alertMessage.textContent = 'Login realizado com sucesso! Redirecionando...';
                     alertMessage.classList.add('alert-success');
                     alertMessage.style.display = 'block';
-
-                    console.log('Token armazenado:', data.token);
 
                     setTimeout(() => {
                         window.location.href = '/dashboard';
@@ -348,6 +344,8 @@
                 btnSubmit.textContent = 'Entrar';
             }
         }
+
+        document.getElementById('loginForm').addEventListener('submit', handleLogin);
     </script>
 </body>
 </html>

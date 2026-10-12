@@ -12,11 +12,14 @@ module JsonWebToken
   # Fixa o algoritmo na verificação: o token não escolhe como será validado.
   ALGORITHM = "HS256"
 
+  # Validade do token (e do cookie que o carrega).
+  TTL = 24.hours
+
   # Codifica (gera) um token JWT
   # @param payload [Hash] Dados que serão armazenados no token (ex: { user_id: 1 })
   # @param exp [Integer] Tempo de expiração em horas (padrão: 24h)
   # @return [String] Token JWT codificado
-  def self.encode(payload, exp = 24.hours.from_now)
+  def self.encode(payload, exp = TTL.from_now)
     # Adiciona tempo de expiração ao payload
     payload[:exp] = exp.to_i
 

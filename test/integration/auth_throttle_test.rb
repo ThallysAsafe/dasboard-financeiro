@@ -41,7 +41,7 @@ class AuthThrottleTest < ActionDispatch::IntegrationTest
     login(users(:one).email, "123456")
 
     assert_response :ok
-    assert response.parsed_body["token"].present?
+    assert_equal users(:one).email, response.parsed_body.dig("user", "email")
   end
 
   test "GraphQL: userLogin é limitado por e-mail" do
@@ -57,11 +57,12 @@ class AuthThrottleTest < ActionDispatch::IntegrationTest
 
   test "GraphQL: userCreate é limitado por IP" do
     5.times do |i|
-      post "/graphql", params: { query: %(mutation { userCreate(email: "novo#{i}@x.com", password: "123456") { errors } }) }, as: :json
+      post "/graphql", params: { query: %(mutation { userCreate(email: "novo#{i}@x.com", password: "senhaforte123") { errors } }) }, as: :json
       assert_nil response.parsed_body["errors"]
+      assert_empty response.parsed_body.dig("data", "userCreate", "errors")
     end
 
-    post "/graphql", params: { query: 'mutation { userCreate(email: "novo9@x.com", password: "123456") { errors } }' }, as: :json
+    post "/graphql", params: { query: 'mutation { userCreate(email: "novo9@x.com", password: "senhaforte123") { errors } }' }, as: :json
     assert_equal AuthThrottle::MESSAGE, response.parsed_body["errors"].first["message"]
     assert_not User.exists?(email: "novo9@x.com")
   end

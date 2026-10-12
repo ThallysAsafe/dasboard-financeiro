@@ -15,7 +15,11 @@ class User < ApplicationRecord
                     format: { with: URI::MailTo::EMAIL_REGEXP, allow_blank: true }
   # Só exige senha na criação ou quando ela está sendo trocada; senão não dá
   # para atualizar o e-mail sem reenviar a senha.
-  validates :password, presence: true, length: { minimum: 6 }, if: -> { new_record? || !password.nil? }
+  MIN_PASSWORD_LENGTH = 10
+
+  validates :password, presence: true, length: { minimum: MIN_PASSWORD_LENGTH },
+                       if: -> { new_record? || !password.nil? }
+  validate :password_differs_from_email, if: -> { password.present? }
 
   # Trocar a senha derruba as sessões abertas (tokens emitidos antes).
   before_update :bump_token_version, if: :will_save_change_to_password_digest?
@@ -36,5 +40,9 @@ class User < ApplicationRecord
 
   def bump_token_version
     self.token_version += 1
+  end
+
+  def password_differs_from_email
+    errors.add(:password, "não pode ser igual ao e-mail") if password.casecmp?(email.to_s)
   end
 end

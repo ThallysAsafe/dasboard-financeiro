@@ -4,6 +4,7 @@
 # Adicione `include Authenticable` em controllers que precisam de autenticação
 module Authenticable
   extend ActiveSupport::Concern
+  include TokenAuthentication
 
   included do
     # Método executado antes de cada action
@@ -21,19 +22,6 @@ module Authenticable
     @current_user = find_user_from_token
 
     render_unauthorized unless @current_user
-  end
-
-  # Extrai o token do header Authorization
-  # Formato esperado: "Authorization: Bearer <token>"
-  # @return [String, nil] Token JWT ou nil
-  def token_from_request_headers
-    request.headers["Authorization"]&.split(" ")&.last
-  end
-
-  # Busca o usuário a partir do token JWT
-  # @return [User, nil] Usuário autenticado ou nil
-  def find_user_from_token
-    JsonWebToken.user_for(token_from_request_headers)
   end
 
   # Retorna erro 401 (Não autorizado)

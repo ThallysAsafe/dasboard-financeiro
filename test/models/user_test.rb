@@ -39,7 +39,7 @@ class UserTest < ActiveSupport::TestCase
   end
 
   test "e-mail é normalizado (minúsculas, sem espaços) ao salvar" do
-    user = User.create!(email: "  Ana@Exemplo.COM ", password: "123456")
+    user = User.create!(email: "  Ana@Exemplo.COM ", password: "senhaforte123")
 
     assert_equal "ana@exemplo.com", user.email
   end
@@ -63,5 +63,24 @@ class UserTest < ActiveSupport::TestCase
 
   test "find_by com espaços e outra caixa encontra o usuário (base do login)" do
     assert_equal users(:one), User.find_by(email: " UM@exemplo.com ")&.authenticate("123456")
+  end
+
+  test "senha nova exige no mínimo 10 caracteres" do
+    assert_not User.new(email: "a@exemplo.com", password: "123456789").valid?
+    assert User.new(email: "a@exemplo.com", password: "1234567890").valid?
+  end
+
+  test "senha não pode ser igual ao e-mail" do
+    user = User.new(email: "usuario@exemplo.com", password: "USUARIO@exemplo.com")
+
+    assert_not user.valid?
+    assert_includes user.errors[:password], "não pode ser igual ao e-mail"
+  end
+
+  test "conta antiga com senha curta continua podendo logar e trocar o e-mail" do
+    user = User.find(users(:one).id) # fixture com senha "123456"
+
+    assert user.authenticate("123456")
+    assert user.update(email: "novo@exemplo.com")
   end
 end
