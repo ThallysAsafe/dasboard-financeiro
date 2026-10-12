@@ -21,6 +21,9 @@ class RecurringTransaction < ApplicationRecord
                             less_than_or_equal_to: 31 }
   validates :start_date, presence: true
   validate :end_date_after_start_date
+  # Só ao criar ou ao mudar a data de início: um template antigo não pode ficar
+  # inválido (e impossível de pausar) só porque a janela andou com o tempo.
+  validate :start_date_within_backfill_window, if: -> { new_record? || will_save_change_to_start_date? }
 
   scope :active, -> { where(active: true) }
 
@@ -28,6 +31,12 @@ class RecurringTransaction < ApplicationRecord
   # 29/02 em 2028 e 30/04 em qualquer ano.
   def self.occurrence_date(month_anchor, day)
     Date.new(month_anchor.year, month_anchor.month, [ day, month_anchor.end_of_month.day ].min)
+  end
+
+  # Primeiro mês que o backfill alcança. Antes disso os lançamentos nunca seriam
+  # gerados, então a data de início é recusada em vez de cortada em silêncio.
+  def self.earliest_start_date(today: Date.current)
+    (today - (MAX_BACKFILL_MONTHS - 1).months).beginning_of_month
   end
 
   # Pura, sem tocar no banco. Todas as ocorrências ainda devidas, da mais antiga
@@ -42,7 +51,7 @@ class RecurringTransaction < ApplicationRecord
     # exatamente MAX_BACKFILL_MONTHS meses. O corte tem que ser aqui, e não no
     # tamanho da lista: o loop caminha do mais antigo para o mais novo, então
     # parar por tamanho descartaria justamente os meses recentes.
-    floor = (today - (MAX_BACKFILL_MONTHS - 1).months).beginning_of_month
+    floor = self.class.earliest_start_date(today: today)
     anchor = floor if anchor < floor
 
     dates = []
@@ -106,6 +115,15 @@ class RecurringTransaction < ApplicationRecord
   end
 
   private
+
+  def start_date_within_backfill_window
+    return if start_date.blank?
+
+    earliest = self.class.earliest_start_date
+    return if start_date >= earliest
+
+    errors.add(:start_date, "não pode ser anterior a #{I18n.l(earliest)} (o limite de retroação é de #{MAX_BACKFILL_MONTHS} meses)")
+  end
 
   def end_date_after_start_date
     return if end_date.blank? || start_date.blank?

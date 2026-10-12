@@ -193,6 +193,21 @@ class DashboardTest < ApplicationSystemTestCase
     assert_text(/3 lançamentos gerados/)
   end
 
+  test "recorrência com início além de 120 meses mostra o erro no formulário" do
+    sign_in @user
+    open_form("income")
+    fill_in "entryDescription", with: "Antigo"
+    fill_in "entryAmount", with: "100"
+    check "entryRecurring"
+    fill_in "entryDayOfMonth", with: "5"
+    set_date("entryDate", Date.current - 15.years)
+    click_button "entrySubmit"
+
+    assert_selector "#modalAlert", text: /limite de retroação é de 120 meses/
+    assert_selector "#entryModal.open"
+    assert_equal 0, @user.recurring_transactions.count
+  end
+
   test "pausar e retomar a recorrência" do
     sign_in @user
     create_recurring("income", "Salário mensal", 1000, day: 1, start: Date.current.beginning_of_month)
