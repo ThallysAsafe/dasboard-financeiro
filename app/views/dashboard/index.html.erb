@@ -7,158 +7,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <%# Partials em .css/.js e não .html: em desenvolvimento o Rails anota cada
+        partial HTML com <!-- BEGIN ... -->, e dentro de <script> o <!-- inicia
+        um comentário de linha, o que comentaria a primeira linha do código. %>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .navbar {
-            background: rgba(30, 41, 59, 0.8);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-            padding: 16px 32px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .navbar-brand {
-            font-size: 20px;
-            font-weight: 700;
-            color: #60a5fa;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .user-email {
-            font-size: 14px;
-            color: #94a3b8;
-        }
-
-        .btn-logout {
-            padding: 8px 16px;
-            background: rgba(239, 68, 68, 0.15);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: #fca5a5;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .btn-logout:hover {
-            background: rgba(239, 68, 68, 0.25);
-            color: #ffffff;
-        }
-
-        .main-content {
-            flex: 1;
-            padding: 40px 32px;
-            max-width: 1200px;
-            width: 100%;
-            margin: 0 auto;
-        }
-
-        .dashboard-header {
-            margin-bottom: 32px;
-        }
-
-        .dashboard-header h1 {
-            font-size: 28px;
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-
-        .dashboard-header p {
-            color: #94a3b8;
-            font-size: 14px;
-        }
-
-        .section-title {
-            font-size: 20px;
-            font-weight: 600;
-            margin-top: 40px;
-            margin-bottom: 16px;
-            color: #e2e8f0;
-        }
-
-        .card-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 24px;
-            margin-top: 16px;
-        }
-
-        .card {
-            background: rgba(30, 41, 59, 0.6);
-            border: 1px solid rgba(148, 163, 184, 0.1);
-            border-radius: 16px;
-            padding: 24px;
-            transition: transform 0.2s ease;
-        }
-
-        .card:hover {
-            transform: translateY(-2px);
-        }
-
-        .card h3 {
-            font-size: 14px;
-            font-weight: 500;
-            color: #94a3b8;
-            margin-bottom: 12px;
-        }
-
-        .card .value {
-            font-size: 28px;
-            font-weight: 700;
-            color: #f8fafc;
-        }
-
-        .card.balance .value {
-            color: #60a5fa;
-        }
-
-        .card.income .value {
-            color: #4ade80;
-        }
-
-        .card.expense .value {
-            color: #f87171;
-        }
-
-        .wallet-card {
-            background: rgba(30, 41, 59, 0.4);
-            border: 1px solid rgba(59, 130, 246, 0.2);
-        }
-
-        .wallet-card .wallet-name {
-            font-size: 16px;
-            font-weight: 600;
-            color: #f8fafc;
-            margin-bottom: 8px;
-        }
-
-        .wallet-card .wallet-balance {
-            font-size: 22px;
-            font-weight: 700;
-            color: #38bdf8;
-        }
+<%= raw render(partial: "styles", formats: [ :css ]) %>
     </style>
 </head>
 <body>
@@ -174,7 +27,13 @@
         <div class="dashboard-header">
             <h1>Painel Principal</h1>
             <p>Resumo financeiro e carteiras carregadas em tempo real via GraphQL.</p>
+            <div class="actions-bar">
+                <button class="btn-income" onclick="openCreate('income')">+ Nova Receita</button>
+                <button class="btn-expense" onclick="openCreate('expense')">+ Nova Despesa</button>
+            </div>
         </div>
+
+        <div id="pageAlert" class="alert-message"></div>
 
         <div class="card-grid">
             <div class="card balance">
@@ -196,119 +55,39 @@
         <h2 class="section-title">Minhas Carteiras</h2>
         <div id="walletsGrid" class="card-grid">
             <div class="card wallet-card">
-                <div class="wallet-name">Nenhuma carteira cadastrada</div>
+                <div class="wallet-name">Carregando...</div>
                 <div class="wallet-balance">R$ 0,00</div>
             </div>
         </div>
+
+        <div class="section-header">
+            <h2 class="section-title">Receitas</h2>
+            <button class="btn-income" onclick="openCreate('income')">+ Nova Receita</button>
+        </div>
+        <div id="incomesList" class="entry-list">
+            <div class="empty-state">Carregando...</div>
+        </div>
+
+        <div class="section-header">
+            <h2 class="section-title">Despesas</h2>
+            <button class="btn-expense" onclick="openCreate('expense')">+ Nova Despesa</button>
+        </div>
+        <div id="expensesList" class="entry-list">
+            <div class="empty-state">Carregando...</div>
+        </div>
+
+        <div class="section-header">
+            <h2 class="section-title">Lançamentos Recorrentes</h2>
+        </div>
+        <div id="recurringList" class="entry-list">
+            <div class="empty-state">Carregando...</div>
+        </div>
     </main>
 
+    <%= render "entry_modal" %>
+
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const token = localStorage.getItem('token');
-            const userJson = localStorage.getItem('user');
-
-            if (!token) {
-                window.location.href = '/login';
-                return;
-            }
-
-            if (userJson) {
-                try {
-                    const user = JSON.parse(userJson);
-                    document.getElementById('userEmailDisplay').textContent = user.email || 'Usuário Autenticado';
-                } catch (e) {
-                    document.getElementById('userEmailDisplay').textContent = 'Usuário Autenticado';
-                }
-            }
-
-            loadFinancialData(token);
-        });
-
-        async function loadFinancialData(token) {
-            const query = `
-                query GetFinancialMetrics {
-                    balance
-                    totalIncome
-                    totalExpense
-                    wallets {
-                        id
-                        name
-                        balance
-                        totalIncome
-                        totalExpense
-                    }
-                }
-            `;
-
-            try {
-                const response = await fetch('/graphql', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ query })
-                });
-
-                const result = await response.json();
-
-                if (result.errors && result.errors.length > 0) {
-                    console.error('Erros GraphQL:', result.errors);
-                    if (result.errors.some(err => err.message.includes('autenticado'))) {
-                        handleLogout();
-                    }
-                    return;
-                }
-
-                if (result.data) {
-                    const { balance, totalIncome, totalExpense, wallets } = result.data;
-                    document.getElementById('balanceValue').textContent = formatCurrency(balance);
-                    document.getElementById('incomeValue').textContent = formatCurrency(totalIncome);
-                    document.getElementById('expenseValue').textContent = formatCurrency(totalExpense);
-
-                    renderWallets(wallets || []);
-                }
-            } catch (error) {
-                console.error('Erro na requisição GraphQL:', error);
-            }
-        }
-
-        function renderWallets(wallets) {
-            const grid = document.getElementById('walletsGrid');
-            if (!wallets || wallets.length === 0) {
-                grid.innerHTML = `
-                    <div class="card wallet-card">
-                        <div class="wallet-name">Nenhuma carteira cadastrada</div>
-                        <div class="wallet-balance">R$ 0,00</div>
-                    </div>
-                `;
-                return;
-            }
-
-            grid.innerHTML = wallets.map(wallet => `
-                <div class="card wallet-card">
-                    <div class="wallet-name">${escapeHtml(wallet.name)}</div>
-                    <div class="wallet-balance">${formatCurrency(wallet.balance)}</div>
-                    <div style="font-size: 12px; color: #94a3b8; margin-top: 8px;">
-                        + ${formatCurrency(wallet.totalIncome)} | - ${formatCurrency(wallet.totalExpense)}
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function formatCurrency(value) {
-            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
-        }
-
-        function escapeHtml(str) {
-            return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        }
-
-        function handleLogout() {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/login';
-        }
+<%= raw render(partial: "scripts", formats: [ :js ]) %>
     </script>
 </body>
 </html>

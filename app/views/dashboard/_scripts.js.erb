@@ -1,0 +1,532 @@
+const DASHBOARD_QUERY = `
+    query Dashboard {
+        balance
+        totalIncome
+        totalExpense
+        wallets { id name balance totalIncome totalExpense }
+        incomes { id description amount date category recurringIncomeId wallet { id name } }
+        expenses { id description amount date category recurringExpenseId wallet { id name } }
+        recurringIncomes { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
+        recurringExpenses { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
+    }
+`;
+
+const state = { wallets: [], incomes: [], expenses: [], recurring: [] };
+let modalState = { kind: 'income', mode: 'create', id: null, recurring: false };
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+
+    const userJson = localStorage.getItem('user');
+    let email = 'Usuário Autenticado';
+    if (userJson) {
+        try {
+            email = JSON.parse(userJson).email || email;
+        } catch (e) {
+            // localStorage corrompido: segue com o rótulo genérico.
+        }
+    }
+    document.getElementById('userEmailDisplay').textContent = email;
+
+    // Falha de sincronização não pode derrubar a página: no pior caso as listas
+    // ficam sem os lançamentos recorrentes mais recentes.
+    try {
+        const created = await syncRecurring();
+        if (created > 0) {
+            showAlert('info', `${created} ${created === 1 ? 'lançamento recorrente foi gerado' : 'lançamentos recorrentes foram gerados'} automaticamente.`);
+        }
+    } catch (error) {
+        console.warn('Não foi possível sincronizar as recorrências:', error);
+    }
+
+    await loadDashboard();
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeModal();
+});
+
+// --- Comunicação ---
+
+async function graphqlRequest(query, variables = {}) {
+    const response = await fetch('/graphql', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ query, variables })
+    });
+
+    const result = await response.json();
+
+    if (result.errors && result.errors.length > 0) {
+        if (result.errors.some(err => err.message.includes('autenticado'))) handleLogout();
+        throw new Error(result.errors.map(err => err.message).join(' | '));
+    }
+
+    return result.data;
+}
+
+async function syncRecurring() {
+    const data = await graphqlRequest('mutation { syncRecurringEntries { createdCount errors } }');
+    return data.syncRecurringEntries.createdCount;
+}
+
+async function loadDashboard() {
+    try {
+        const data = await graphqlRequest(DASHBOARD_QUERY);
+
+        state.wallets = data.wallets || [];
+        state.incomes = data.incomes || [];
+        state.expenses = data.expenses || [];
+        state.recurring = [
+            ...(data.recurringIncomes || []).map(item => ({ ...item, kind: 'income' })),
+            ...(data.recurringExpenses || []).map(item => ({ ...item, kind: 'expense' }))
+        ];
+
+        document.getElementById('balanceValue').textContent = formatCurrency(data.balance);
+        document.getElementById('incomeValue').textContent = formatCurrency(data.totalIncome);
+        document.getElementById('expenseValue').textContent = formatCurrency(data.totalExpense);
+
+        renderWallets();
+        renderEntries('income');
+        renderEntries('expense');
+        renderRecurring();
+    } catch (error) {
+        console.error('Erro ao carregar o dashboard:', error);
+        showAlert('error', `Não foi possível carregar os dados: ${error.message}`);
+    }
+}
+
+// --- Renderização ---
+
+function renderWallets() {
+    const grid = document.getElementById('walletsGrid');
+
+    if (state.wallets.length === 0) {
+        grid.innerHTML = `
+            <div class="card wallet-card">
+                <div class="wallet-name">Nenhuma carteira cadastrada</div>
+                <div class="wallet-balance">R$ 0,00</div>
+            </div>
+        `;
+        return;
+    }
+
+    grid.innerHTML = state.wallets.map(wallet => `
+        <div class="card wallet-card">
+            <div class="wallet-name">${escapeHtml(wallet.name)}</div>
+            <div class="wallet-balance">${formatCurrency(wallet.balance)}</div>
+            <div style="font-size: 12px; color: #94a3b8; margin-top: 8px;">
+                + ${formatCurrency(wallet.totalIncome)} | - ${formatCurrency(wallet.totalExpense)}
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderEntries(kind) {
+    const isIncome = kind === 'income';
+    const entries = isIncome ? state.incomes : state.expenses;
+    const container = document.getElementById(isIncome ? 'incomesList' : 'expensesList');
+
+    if (entries.length === 0) {
+        container.innerHTML = `<div class="empty-state">Nenhuma ${isIncome ? 'receita' : 'despesa'} cadastrada ainda.</div>`;
+        return;
+    }
+
+    container.innerHTML = entries.map(entry => {
+        const fromRecurrence = isIncome ? entry.recurringIncomeId : entry.recurringExpenseId;
+        return `
+            <div class="entry-row">
+                <div class="entry-date">${formatDate(entry.date)}</div>
+                <div class="entry-description">
+                    <span>${escapeHtml(entry.description)}</span>
+                    ${fromRecurrence ? '<span class="badge badge-recurring">🔁 recorrente</span>' : ''}
+                </div>
+                <div class="entry-meta">${entryMeta(entry)}</div>
+                <div class="entry-amount ${isIncome ? 'positive' : 'negative'}">
+                    ${isIncome ? '+' : '-'} ${formatCurrency(entry.amount)}
+                </div>
+                <div class="entry-actions">
+                    <button class="btn-icon" onclick="openEdit('${kind}', '${entry.id}')">Editar</button>
+                    <button class="btn-icon danger" onclick="deleteEntry('${kind}', '${entry.id}')">Excluir</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderRecurring() {
+    const container = document.getElementById('recurringList');
+
+    if (state.recurring.length === 0) {
+        container.innerHTML = `<div class="empty-state">Nenhuma recorrência cadastrada. Marque "Repetir todo mês" ao criar uma receita ou despesa.</div>`;
+        return;
+    }
+
+    container.innerHTML = state.recurring.map(template => `
+        <div class="entry-row ${template.active ? '' : 'paused'}">
+            <div class="entry-date">todo dia ${template.dayOfMonth}</div>
+            <div class="entry-description">
+                <span>${escapeHtml(template.description)}</span>
+                <span class="badge badge-${template.kind}">${template.kind === 'income' ? 'Receita' : 'Despesa'}</span>
+                ${template.active ? '' : '<span class="badge badge-paused">pausada</span>'}
+            </div>
+            <div class="entry-meta">${recurringMeta(template)}</div>
+            <div class="entry-amount ${template.kind === 'income' ? 'positive' : 'negative'}">
+                ${formatCurrency(template.amount)}
+            </div>
+            <div class="entry-actions">
+                <button class="btn-icon" onclick="openEditRecurring('${template.kind}', '${template.id}')">Editar</button>
+                <button class="btn-icon" onclick="toggleRecurringActive('${template.kind}', '${template.id}')">${template.active ? 'Pausar' : 'Retomar'}</button>
+                <button class="btn-icon danger" onclick="deleteRecurring('${template.kind}', '${template.id}')">Excluir</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function entryMeta(entry) {
+    const parts = [];
+    if (entry.category) parts.push(escapeHtml(entry.category));
+    if (entry.wallet) parts.push(escapeHtml(entry.wallet.name));
+    return parts.join(' • ') || '—';
+}
+
+function recurringMeta(template) {
+    const parts = [`desde ${formatMonthYear(template.startDate)}`];
+    if (template.endDate) parts.push(`até ${formatDate(template.endDate)}`);
+    if (template.active && template.nextOccurrence) parts.push(`próximo: ${formatDate(template.nextOccurrence)}`);
+    if (template.wallet) parts.push(escapeHtml(template.wallet.name));
+    return parts.join(' • ');
+}
+
+function renderWalletOptions(selectedId) {
+    const select = document.getElementById('entryWallet');
+    const options = ['<option value="">Sem carteira</option>'].concat(
+        state.wallets.map(wallet => `<option value="${wallet.id}">${escapeHtml(wallet.name)}</option>`)
+    );
+    select.innerHTML = options.join('');
+    select.value = selectedId == null ? '' : String(selectedId);
+}
+
+// --- Modal ---
+
+function openCreate(kind) {
+    modalState = { kind, mode: 'create', id: null, recurring: false };
+
+    document.getElementById('entryForm').reset();
+    document.getElementById('entryDate').value = todayISO();
+    document.getElementById('entryRecurring').disabled = false;
+    document.getElementById('entryActiveWrapper').style.display = 'none';
+    // Pré-seleciona a primeira carteira: lançamento sem carteira é sempre
+    // possível, mas raramente é o que o usuário quer.
+    renderWalletOptions(state.wallets.length ? state.wallets[0].id : null);
+    toggleRecurringFields();
+
+    document.getElementById('modalTitle').textContent = kind === 'income' ? 'Nova Receita' : 'Nova Despesa';
+    openModal();
+}
+
+function openEdit(kind, id) {
+    const entries = kind === 'income' ? state.incomes : state.expenses;
+    const entry = entries.find(item => String(item.id) === String(id));
+    if (!entry) return;
+
+    modalState = { kind, mode: 'edit', id, recurring: false };
+
+    document.getElementById('entryForm').reset();
+    document.getElementById('entryDescription').value = entry.description;
+    document.getElementById('entryAmount').value = entry.amount;
+    document.getElementById('entryDate').value = entry.date;
+    document.getElementById('entryCategory').value = entry.category || '';
+    renderWalletOptions(entry.wallet ? entry.wallet.id : null);
+
+    // Um lançamento avulso não vira recorrência (e vice-versa): são registros
+    // de naturezas diferentes.
+    document.getElementById('entryRecurring').checked = false;
+    document.getElementById('entryRecurring').disabled = true;
+    document.getElementById('entryActiveWrapper').style.display = 'none';
+    toggleRecurringFields();
+
+    document.getElementById('modalTitle').textContent = kind === 'income' ? 'Editar Receita' : 'Editar Despesa';
+    openModal();
+}
+
+function openEditRecurring(kind, id) {
+    const template = state.recurring.find(item => item.kind === kind && String(item.id) === String(id));
+    if (!template) return;
+
+    modalState = { kind, mode: 'edit', id, recurring: true };
+
+    document.getElementById('entryForm').reset();
+    document.getElementById('entryDescription').value = template.description;
+    document.getElementById('entryAmount').value = template.amount;
+    document.getElementById('entryDate').value = template.startDate;
+    document.getElementById('entryCategory').value = template.category || '';
+    renderWalletOptions(template.wallet ? template.wallet.id : null);
+
+    document.getElementById('entryRecurring').checked = true;
+    document.getElementById('entryRecurring').disabled = true;
+    document.getElementById('entryDayOfMonth').value = template.dayOfMonth;
+    document.getElementById('entryEndDate').value = template.endDate || '';
+    document.getElementById('entryActive').checked = template.active;
+    document.getElementById('entryActiveWrapper').style.display = 'flex';
+    toggleRecurringFields();
+
+    document.getElementById('modalTitle').textContent = kind === 'income' ? 'Editar Receita Recorrente' : 'Editar Despesa Recorrente';
+    openModal();
+}
+
+function toggleRecurringFields() {
+    const enabled = document.getElementById('entryRecurring').checked;
+    modalState.recurring = enabled;
+
+    document.getElementById('recurringFields').style.display = enabled ? 'block' : 'none';
+    document.getElementById('entryDateLabel').textContent = enabled ? 'Início' : 'Data';
+
+    const dayField = document.getElementById('entryDayOfMonth');
+    dayField.required = enabled;
+
+    if (enabled && !dayField.value) {
+        const chosen = document.getElementById('entryDate').value;
+        dayField.value = chosen ? parseInt(chosen.split('-')[2], 10) : new Date().getDate();
+    }
+}
+
+function openModal() {
+    hideModalAlert();
+    document.getElementById('entryModal').classList.add('open');
+    document.getElementById('entryDescription').focus();
+}
+
+function closeModal() {
+    document.getElementById('entryModal').classList.remove('open');
+}
+
+function handleOverlayClick(event) {
+    if (event.target === event.currentTarget) closeModal();
+}
+
+// --- Escrita ---
+
+async function handleEntrySubmit(event) {
+    event.preventDefault();
+
+    const button = document.getElementById('entrySubmit');
+    const originalLabel = button.textContent;
+    hideModalAlert();
+
+    const walletValue = document.getElementById('entryWallet').value;
+    const variables = {
+        description: document.getElementById('entryDescription').value.trim(),
+        amount: parseFloat(document.getElementById('entryAmount').value),
+        category: document.getElementById('entryCategory').value.trim() || null,
+        walletId: walletValue || null
+    };
+    const args = [
+        { name: 'description', type: 'String!' },
+        { name: 'amount', type: 'Float!' },
+        { name: 'category', type: 'String' },
+        { name: 'walletId', type: 'ID' }
+    ];
+
+    if (modalState.recurring) {
+        variables.dayOfMonth = parseInt(document.getElementById('entryDayOfMonth').value, 10);
+        variables.startDate = document.getElementById('entryDate').value;
+        variables.endDate = document.getElementById('entryEndDate').value || null;
+        args.push(
+            { name: 'dayOfMonth', type: 'Int!' },
+            { name: 'startDate', type: 'ISO8601Date!' },
+            { name: 'endDate', type: 'ISO8601Date' }
+        );
+
+        if (modalState.mode === 'edit') {
+            variables.active = document.getElementById('entryActive').checked;
+            args.push({ name: 'active', type: 'Boolean' });
+        }
+    } else {
+        variables.date = document.getElementById('entryDate').value;
+        args.push({ name: 'date', type: 'ISO8601Date!' });
+    }
+
+    if (modalState.mode === 'edit') {
+        variables.id = modalState.id;
+        args.unshift({ name: 'id', type: 'ID!' });
+    }
+
+    const operation = mutationName();
+    const payload = modalState.recurring ? 'generatedCount errors' : 'errors';
+    const declaration = args.map(arg => `$${arg.name}: ${arg.type}`).join(', ');
+    const forwarding = args.map(arg => `${arg.name}: $${arg.name}`).join(', ');
+    const mutation = `mutation(${declaration}) { ${operation}(${forwarding}) { ${payload} } }`;
+
+    button.disabled = true;
+    button.textContent = 'Salvando...';
+
+    try {
+        const result = (await graphqlRequest(mutation, variables))[operation];
+
+        if (result.errors.length > 0) {
+            showModalAlert(result.errors.join(' • '));
+            return;
+        }
+
+        closeModal();
+        await loadDashboard();
+        showAlert('success', savedMessage(result.generatedCount));
+    } catch (error) {
+        showModalAlert(error.message);
+    } finally {
+        button.disabled = false;
+        button.textContent = originalLabel;
+    }
+}
+
+function mutationName() {
+    const base = modalState.recurring
+        ? (modalState.kind === 'income' ? 'recurringIncome' : 'recurringExpense')
+        : (modalState.kind === 'income' ? 'income' : 'expense');
+    return base + (modalState.mode === 'create' ? 'Create' : 'Update');
+}
+
+function savedMessage(generatedCount) {
+    if (modalState.recurring && generatedCount > 0) {
+        return `Recorrência salva. ${generatedCount} ${generatedCount === 1 ? 'lançamento gerado' : 'lançamentos gerados'}.`;
+    }
+    return modalState.recurring ? 'Recorrência salva com sucesso.' : 'Lançamento salvo com sucesso.';
+}
+
+async function deleteEntry(kind, id) {
+    const entries = kind === 'income' ? state.incomes : state.expenses;
+    const entry = entries.find(item => String(item.id) === String(id));
+    if (!entry || !confirm(`Excluir "${entry.description}"?`)) return;
+
+    const operation = kind === 'income' ? 'incomeDelete' : 'expenseDelete';
+    await runMutation(
+        `mutation($id: ID!) { ${operation}(id: $id) { errors } }`,
+        { id },
+        operation,
+        'Lançamento excluído.'
+    );
+}
+
+async function deleteRecurring(kind, id) {
+    const template = state.recurring.find(item => item.kind === kind && String(item.id) === String(id));
+    if (!template) return;
+
+    const confirmed = confirm(
+        `Excluir a recorrência "${template.description}"?\n\n` +
+        'Os lançamentos já gerados serão mantidos no histórico.'
+    );
+    if (!confirmed) return;
+
+    const operation = kind === 'income' ? 'recurringIncomeDelete' : 'recurringExpenseDelete';
+    await runMutation(
+        `mutation($id: ID!) { ${operation}(id: $id) { errors } }`,
+        { id },
+        operation,
+        'Recorrência excluída. Os lançamentos já gerados foram mantidos.'
+    );
+}
+
+async function toggleRecurringActive(kind, id) {
+    const template = state.recurring.find(item => item.kind === kind && String(item.id) === String(id));
+    if (!template) return;
+
+    const operation = kind === 'income' ? 'recurringIncomeUpdate' : 'recurringExpenseUpdate';
+    await runMutation(
+        `mutation($id: ID!, $active: Boolean) { ${operation}(id: $id, active: $active) { generatedCount errors } }`,
+        { id, active: !template.active },
+        operation,
+        template.active ? 'Recorrência pausada.' : 'Recorrência retomada.'
+    );
+}
+
+async function runMutation(mutation, variables, operation, successMessage) {
+    try {
+        const result = (await graphqlRequest(mutation, variables))[operation];
+
+        if (result.errors.length > 0) {
+            showAlert('error', result.errors.join(' • '));
+            return;
+        }
+
+        await loadDashboard();
+        showAlert('success', successMessage);
+    } catch (error) {
+        showAlert('error', error.message);
+    }
+}
+
+// --- Utilitários ---
+
+function formatCurrency(value) {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+}
+
+// Split puro em vez de new Date(): '2026-08-09' é meia-noite UTC e viraria
+// 08/08 em qualquer fuso a oeste de Greenwich.
+function formatDate(iso) {
+    if (!iso) return '--';
+    const [year, month, day] = iso.split('-');
+    return `${day}/${month}/${year}`;
+}
+
+function formatMonthYear(iso) {
+    if (!iso) return '--';
+    const [year, month] = iso.split('-');
+    return `${month}/${year}`;
+}
+
+// toISOString() também é UTC: depois das 21h em Brasília devolveria amanhã.
+function todayISO() {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${now.getFullYear()}-${month}-${day}`;
+}
+
+function escapeHtml(str) {
+    return String(str == null ? '' : str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+let alertTimer = null;
+
+function showAlert(kind, message) {
+    const box = document.getElementById('pageAlert');
+    box.textContent = message;
+    box.className = `alert-message alert-${kind}`;
+    box.style.display = 'block';
+
+    clearTimeout(alertTimer);
+    alertTimer = setTimeout(() => { box.style.display = 'none'; }, 5000);
+}
+
+function showModalAlert(message) {
+    const box = document.getElementById('modalAlert');
+    box.textContent = message;
+    box.className = 'alert-message alert-error';
+    box.style.display = 'block';
+}
+
+function hideModalAlert() {
+    const box = document.getElementById('modalAlert');
+    box.style.display = 'none';
+    box.className = 'alert-message';
+}
+
+function handleLogout() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+}
