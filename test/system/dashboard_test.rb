@@ -9,9 +9,7 @@ class DashboardTest < ApplicationSystemTestCase
   end
 
   def open_form(kind)
-    click_with_retry(-> { first("[data-action='open-create'][data-kind='#{kind}']") }) do |wait|
-      page.has_css?("#entryModal.open", wait: wait)
-    end
+    first("[data-action='open-create'][data-kind='#{kind}']").click
     assert_selector "#entryModal.open"
   end
 

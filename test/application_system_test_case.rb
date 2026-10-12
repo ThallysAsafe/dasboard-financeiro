@@ -1,6 +1,104 @@
 require "test_helper"
 
+# O Chrome headless, de vez em quando, não entrega à página a entrada (mouse ou
+# teclado) que o Selenium despachou: nenhum evento chega ao documento, mesmo com a
+# página pronta, em foco e sem nada cobrindo o botão (medido no Chrome estável, ~1
+# interação em 100). O clique é conferido por uma sonda no documento e, se nada
+# chegou, é despachado por JavaScript; o texto digitado é conferido no campo e, se
+# não bateu, é gravado por JavaScript. Quem escreve o teste não precisa saber disso,
+# e nada é refeito quando a página JÁ recebeu a entrada, então não dobra.
+module ReliableClick
+  ARM_PROBE = <<~JS.freeze
+    window.__clicks = 0;
+    if (!window.__clickProbe) {
+      window.__clickProbe = true;
+      document.addEventListener('click', () => { window.__clicks += 1; }, true);
+    }
+  JS
+
+  def click(keys = [], **options)
+    armed = arm_click_probe
+    super
+    return unless armed && click_lost?
+
+    ApplicationSystemTestCase.js_fallbacks[:clique] += 1
+    # Assíncrono (setTimeout) para o comando do driver voltar na hora: se o clique abrir
+    # um confirm(), um clique síncrono ficaria bloqueado no diálogo, e o Capybara
+    # (accept_confirm) precisa assumir o diálogo, não o nosso script.
+    begin
+      driver.execute_script("const el = arguments[0]; setTimeout(() => el.click(), 0)", self)
+    rescue Selenium::WebDriver::Error::StaleElementReferenceError,
+           Selenium::WebDriver::Error::UnexpectedAlertOpenError
+      nil # a página já mudou ou já há um diálogo: o clique chegou
+    end
+  end
+
+  private
+
+  def arm_click_probe
+    driver.execute_script(ARM_PROBE)
+    true
+  rescue StandardError
+    false
+  end
+
+  # 0 = a sonda existe e nenhum clique chegou; nil = documento novo (a página
+  # navegou); erro = há um diálogo aberto. Os dois últimos significam que o clique
+  # chegou.
+  def click_lost?
+    10.times do
+      return false unless driver.evaluate_script("window.__clicks") == 0
+
+      sleep 0.05
+    end
+    true
+  rescue StandardError
+    false
+  end
+end
+
+module ReliableTyping
+  TEXTUAL_INPUTS = %w[text password email number search tel url].freeze
+
+  def set(value, **options)
+    super
+    return unless value.is_a?(String) || value.is_a?(Numeric)
+    return unless textual_field?
+
+    expected = value.to_s
+    return if native.attribute("value") == expected
+
+    ApplicationSystemTestCase.js_fallbacks[:digitacao] += 1
+    driver.execute_script(<<~JS, self, expected)
+      arguments[0].value = arguments[1];
+      arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+      arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+    JS
+  end
+
+  private
+
+  def textual_field?
+    tag_name == "textarea" || (tag_name == "input" && TEXTUAL_INPUTS.include?(self[:type].presence || "text"))
+  end
+end
+
+Capybara::Selenium::Node.prepend(ReliableClick)
+Capybara::Selenium::Node.prepend(ReliableTyping)
+
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
+  # Quantas entradas o Chrome perdeu e foram refeitas por JavaScript (ver ReliableClick).
+  class << self
+    attr_accessor :js_fallbacks
+  end
+  self.js_fallbacks = Hash.new(0)
+
+  Minitest.after_run do
+    if js_fallbacks.values.sum.positive?
+      puts "\nEntradas perdidas pelo Chrome e refeitas por JavaScript: #{js_fallbacks.map { |k, v| "#{k}=#{v}" }.join(', ')}"
+    end
+  end
+
   # CHROME_BIN / CHROMEDRIVER_PATH existem no container de desenvolvimento
   # (Dockerfile.dev); no CI o Chrome vem do runner e o Selenium acha sozinho.
   Selenium::WebDriver::Chrome::Service.driver_path = ENV["CHROMEDRIVER_PATH"] if ENV["CHROMEDRIVER_PATH"]
@@ -21,6 +119,9 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     # sempre igual.
     options.add_argument("--host-resolver-rules=MAP fonts.googleapis.com 127.0.0.1,MAP fonts.gstatic.com 127.0.0.1")
     options.add_option("goog:loggingPrefs", { browser: "ALL" })
+    # Não cancelar um confirm() aberto quando o teste consulta a página; o Capybara
+    # trata os diálogos explicitamente (accept_confirm / dismiss_confirm).
+    options.unhandled_prompt_behavior = :ignore
   end
 
   setup do
@@ -41,19 +142,8 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     visit "/login"
     fill_in "email", with: user.email
     fill_in "password", with: password
-    click_with_retry(-> { find_button("Entrar") }) { |wait| page.has_current_path?("/dashboard", wait: wait) }
+    click_button "Entrar"
     assert_dashboard_ready(user.email)
-  end
-
-  # O Chrome headless descarta, muito raramente, um clique mesmo com a página pronta
-  # (visto só no Chrome estável, em uma de cada ~90 interações). Reclicar é seguro
-  # quando o clique é idempotente (entrar, abrir o formulário); NÃO use em ações que
-  # alternam estado (pausar, excluir). O bloco diz se o efeito esperado apareceu.
-  def click_with_retry(finder, attempts: 3, wait: 3, &effect)
-    attempts.times do
-      finder.call.click
-      return if effect.call(wait)
-    end
   end
 
   # A URL muda antes de o JavaScript da página (módulo, carregado de forma diferida)
