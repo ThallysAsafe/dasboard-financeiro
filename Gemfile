@@ -21,10 +21,10 @@ gem "jbuilder"
 # Gemfile
 
 # Para API GraphQL
-gem 'graphql'
+gem "graphql"
 
 # Para gerar e ler JSON Web Tokens (JWT)
-gem 'jwt'
+gem "jwt"
 # Use Redis adapter to run Action Cable in production
 # gem "redis", ">= 4.0.1"
 
@@ -33,6 +33,15 @@ gem 'jwt'
 
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 gem "bcrypt", "~> 3.1.7"
+
+# Rate limiting de login e cadastro
+gem "rack-attack"
+
+# Fila de jobs e scheduler (cron) no próprio Postgres, sem Redis nem processo extra
+gem "good_job"
+
+# Traduções do Rails (mensagens de validação etc.) para pt-BR
+gem "rails-i18n", "~> 7.0"
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]

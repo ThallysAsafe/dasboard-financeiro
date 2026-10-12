@@ -7,52 +7,73 @@ module Api
     class AuthController < ApplicationController
       # Pula a autenticação para login (não faz sentido pedir token para fazer login)
       skip_before_action :verify_authenticity_token
-      
+
       # Adiciona autenticação apenas para as actions que precisam
       include Authenticable
-      skip_before_action :authenticate_request!, only: [:login]
+      skip_before_action :authenticate_request!, only: [ :login, :signup ]
 
       # POST /api/v1/auth/login
-      # Faz login e retorna um token JWT
-      # 
+      # Faz login e grava o token JWT em um cookie HttpOnly
+      #
       # Corpo da requisição:
       # {
       #   "email": "usuario@exemplo.com",
       #   "password": "senha123"
       # }
-      # 
-      # Resposta de sucesso (200):
+      #
+      # Resposta de sucesso (200): o token vai num cookie HttpOnly (o JS do
+      # navegador não o enxerga) e o corpo traz só o usuário:
       # {
-      #   "token": "eyJhbGciOiJIUzI1NiJ9...",
       #   "user": {
       #     "id": 1,
       #     "email": "usuario@exemplo.com"
       #   }
       # }
+      # Clientes que não são navegador obtêm um token Bearer pela mutation
+      # GraphQL `userLogin`.
       def login
-        user = User.find_by(email: params[:email])
+        user = User.authenticate_with(params[:email], params[:password])
 
-        # Valida se o usuário existe e a senha está correta
-        if user&.authenticate(params[:password])
-          # Gera o token JWT com o ID do usuário
-          token = JsonWebToken.encode(user_id: user.id)
-          
+        if user
+          set_auth_cookie(user)
+
           render json: {
-            token: token,
             user: {
               id: user.id,
               email: user.email
             }
           }, status: :ok
         else
-          render json: { error: 'Email ou senha inválidos' }, status: :unauthorized
+          render json: { error: "Email ou senha inválidos" }, status: :unauthorized
+        end
+      end
+
+      # POST /api/v1/auth/signup
+      # Cria o usuário (a carteira nasce junto) e já abre a sessão pelo cookie.
+      #
+      # Corpo: { "email": "...", "password": "...", "password_confirmation": "..." }
+      # Sucesso (201): { "user": { "id": 1, "email": "..." } }
+      # Falha (422):   { "errors": [ "E-mail já está em uso", ... ] }
+      def signup
+        user = User.new(
+          email: params[:email],
+          password: params[:password],
+          # to_s: sem a confirmação o has_secure_password não a validaria
+          password_confirmation: params[:password_confirmation].to_s
+        )
+
+        if user.save
+          set_auth_cookie(user)
+          render json: { user: { id: user.id, email: user.email } }, status: :created
+        else
+          render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
         end
       end
 
       # GET /api/v1/auth/me
       # Retorna informações do usuário autenticado
       # Requer token JWT no header: Authorization: Bearer <token>
-      # 
+      #
       # Resposta de sucesso (200):
       # {
       #   "user": {
@@ -70,17 +91,18 @@ module Api
       end
 
       # POST /api/v1/auth/logout
-      # Logout (stateless - apenas retorna sucesso)
-      # O cliente deve descartar o token localmente
-      # 
+      # Logout: revoga todos os tokens emitidos para o usuário
+      #
       # Resposta de sucesso (200):
       # {
       #   "message": "Logout realizado com sucesso"
       # }
       def logout
-        # JWT é stateless, então o logout é feito no cliente
-        # O servidor apenas confirma a operação
-        render json: { message: 'Logout realizado com sucesso' }, status: :ok
+        # Invalida todos os tokens do usuário incrementando a versão que eles
+        # carregam; o cliente ainda deve descartar o token localmente.
+        current_user.revoke_tokens!
+        clear_auth_cookie
+        render json: { message: "Logout realizado com sucesso" }, status: :ok
       end
     end
   end

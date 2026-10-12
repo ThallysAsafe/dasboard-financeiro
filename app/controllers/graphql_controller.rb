@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class GraphqlController < ApplicationController
+  include TokenAuthentication
+
   # Se estiver acessando de fora do domínio, nullify a session
   # Isso permite acesso externo à API e previne ataques CSRF
   skip_before_action :verify_authenticity_token
@@ -9,12 +11,13 @@ class GraphqlController < ApplicationController
     variables = prepare_variables(params[:variables])
     query = params[:query]
     operation_name = params[:operationName]
-    
+
     # Contexto do GraphQL com usuário autenticado via JWT
     context = {
       current_user: current_user,
+      ip: request.remote_ip
     }
-    
+
     result = AppSchema.execute(query, variables: variables, context: context, operation_name: operation_name)
     render json: result
   rescue StandardError => e
@@ -28,25 +31,6 @@ class GraphqlController < ApplicationController
   # Se não houver token ou for inválido, retorna nil (GraphQL permitirá queries públicas)
   def current_user
     @current_user ||= find_user_from_token
-  end
-
-  # Extrai o token do header Authorization
-  # Formato esperado: "Authorization: Bearer <token>"
-  def token_from_request_headers
-    request.headers['Authorization']&.split(' ')&.last
-  end
-
-  # Busca o usuário a partir do token JWT
-  def find_user_from_token
-    token = token_from_request_headers
-    return nil unless token
-
-    decoded_token = JsonWebToken.decode(token)
-    return nil unless decoded_token
-
-    User.find_by(id: decoded_token[:user_id])
-  rescue ActiveRecord::RecordNotFound
-    nil
   end
 
   # Handle variables in form data, JSON body, or a blank value
@@ -73,6 +57,6 @@ class GraphqlController < ApplicationController
     logger.error e.message
     logger.error e.backtrace.join("\n")
 
-    render json: { errors: [{ message: e.message, backtrace: e.backtrace }], data: {} }, status: 500
+    render json: { errors: [ { message: e.message, backtrace: e.backtrace } ], data: {} }, status: 500
   end
 end

@@ -1,0 +1,168 @@
+require "test_helper"
+
+# Regras de agendamento da recorrência (clamp de dia, backfill, idempotência…).
+# Os cenários usam receitas; o kind só importa no teste de despesa no final.
+class RecurringTransactionTest < ActiveSupport::TestCase
+  setup do
+    @user = users(:one)
+    @wallet = wallets(:one)
+  end
+
+  def template(attrs = {})
+    @user.recurring_transactions.create!({
+      kind: :income,
+      description: "Salário",
+      amount: 5000,
+      day_of_month: 5,
+      start_date: Date.new(2026, 1, 5),
+      wallet: @wallet
+    }.merge(attrs))
+  end
+
+  test "trava o dia no último dia válido de meses curtos" do
+    t = template(day_of_month: 31, start_date: Date.new(2026, 1, 31))
+
+    assert_equal [ Date.new(2026, 1, 31), Date.new(2026, 2, 28), Date.new(2026, 3, 31) ],
+                 t.occurrence_dates(today: Date.new(2026, 3, 31))
+  end
+
+  test "usa 29 de fevereiro em ano bissexto" do
+    t = template(day_of_month: 31, start_date: Date.new(2028, 2, 1))
+
+    assert_equal [ Date.new(2028, 2, 29) ], t.occurrence_dates(today: Date.new(2028, 2, 29))
+  end
+
+  test "gerar duas vezes não duplica lançamentos" do
+    t = template(day_of_month: 31, start_date: Date.new(2026, 1, 31))
+
+    assert_equal 3, t.generate_entries!(today: Date.new(2026, 3, 31))
+    assert_equal 0, t.generate_entries!(today: Date.new(2026, 3, 31))
+    assert_equal 3, t.transactions.count
+  end
+
+  test "ignora ocorrências anteriores à data de início" do
+    t = template(day_of_month: 5, start_date: Date.new(2026, 1, 20))
+
+    assert_equal Date.new(2026, 2, 5), t.occurrence_dates(today: Date.new(2026, 3, 1)).first
+  end
+
+  test "trata end_date como limite inclusivo" do
+    dentro = template(day_of_month: 10, end_date: Date.new(2026, 2, 15))
+    assert_equal Date.new(2026, 2, 10), dentro.occurrence_dates(today: Date.new(2026, 6, 1)).last
+
+    fora = template(day_of_month: 10, end_date: Date.new(2026, 2, 5))
+    assert_not_includes fora.occurrence_dates(today: Date.new(2026, 6, 1)), Date.new(2026, 2, 10)
+  end
+
+  test "nunca cria lançamento com data futura" do
+    t = template(day_of_month: 10, start_date: Date.new(2026, 8, 1))
+
+    assert_empty t.occurrence_dates(today: Date.new(2026, 8, 3))
+    assert_equal 0, t.generate_entries!(today: Date.new(2026, 8, 3))
+    assert_equal [ Date.new(2026, 8, 10) ], t.occurrence_dates(today: Date.new(2026, 8, 10))
+  end
+
+  test "template pausado não gera nada" do
+    t = template(active: false, start_date: Date.new(2026, 1, 5))
+
+    assert_equal 0, t.generate_entries!(today: Date.new(2026, 6, 5))
+    assert_equal 0, t.transactions.count
+  end
+
+  test "limita a retroação a exatamente 120 meses, mantendo os mais recentes" do
+    hoje = Date.new(2026, 8, 9)
+    t = template(start_date: hoje - 30.years, day_of_month: 5)
+
+    criados = t.generate_entries!(today: hoje)
+
+    assert_equal RecurringTransaction::MAX_BACKFILL_MONTHS, criados
+    # Janela fechada de 120 meses: de set/2016 a ago/2026. O corte descarta os
+    # meses antigos, nunca os recentes.
+    assert_equal Date.new(2016, 9, 5), t.transactions.minimum(:date)
+    assert_equal Date.new(2026, 8, 5), t.transactions.maximum(:date)
+  end
+
+  test "lançamento apagado pelo usuário não é recriado" do
+    t = template(day_of_month: 31, start_date: Date.new(2026, 1, 31))
+    t.generate_entries!(today: Date.new(2026, 3, 31))
+    t.transactions.order(:date).first.destroy
+
+    assert_equal 0, t.generate_entries!(today: Date.new(2026, 3, 31))
+    assert_equal 2, t.transactions.count
+  end
+
+  test "apagar o template preserva os lançamentos já gerados" do
+    t = template(start_date: Date.new(2026, 1, 5))
+    t.generate_entries!(today: Date.new(2026, 3, 5))
+    ids = t.transactions.pluck(:id)
+
+    t.destroy
+
+    assert_equal ids.count, Transaction.where(id: ids).count
+    assert_equal [ nil ], Transaction.where(id: ids).pluck(:recurring_transaction_id).uniq
+  end
+
+  test "copia os atributos do template para o lançamento gerado" do
+    t = template(start_date: Date.new(2026, 1, 5), category: "Trabalho")
+    t.generate_entries!(today: Date.new(2026, 1, 5))
+    income = t.transactions.first
+    assert income.income?
+
+    assert_equal "Salário", income.description
+    assert_equal 5000, income.amount
+    assert_equal "Trabalho", income.category
+    assert_equal @wallet.id, income.wallet_id
+    assert_equal @user.id, income.user_id
+  end
+
+  test "next_occurrence devolve a próxima data travada no mês" do
+    t = template(day_of_month: 31, start_date: Date.new(2026, 1, 31))
+
+    assert_equal Date.new(2026, 4, 30), t.next_occurrence(today: Date.new(2026, 3, 31))
+  end
+
+  test "next_occurrence devolve nil quando a recorrência acabou ou está pausada" do
+    encerrada = template(day_of_month: 5, end_date: Date.new(2026, 3, 5))
+    assert_nil encerrada.next_occurrence(today: Date.new(2026, 6, 1))
+
+    assert_nil template(active: false).next_occurrence(today: Date.new(2026, 1, 1))
+  end
+
+  test "exige end_date igual ou posterior ao início" do
+    invalido = @user.recurring_transactions.build(
+      description: "X", amount: 10, day_of_month: 5,
+      start_date: Date.new(2026, 5, 1), end_date: Date.new(2026, 4, 1)
+    )
+
+    assert_not invalido.valid?
+    assert_includes invalido.errors[:end_date], "deve ser igual ou posterior à data de início"
+  end
+
+  test "valida dia do mês entre 1 e 31" do
+    assert_not @user.recurring_transactions.build(
+      description: "X", amount: 10, day_of_month: 32, start_date: Date.current
+    ).valid?
+  end
+
+  test "template de despesa gera despesas e as preserva ao ser apagado" do
+    t = template(kind: :expense, description: "Aluguel", amount: 1500, day_of_month: 10,
+                 start_date: Date.new(2026, 1, 10))
+
+    assert_equal 3, t.generate_entries!(today: Date.new(2026, 3, 31))
+    assert t.transactions.all?(&:expense?)
+
+    assert_no_difference "Transaction.count" do
+      t.destroy
+    end
+    assert_equal 3, @user.transactions.expense.where(description: "Aluguel").count
+    assert_nil @user.transactions.expense.find_by(description: "Aluguel").recurring_transaction_id
+  end
+
+  test "exige um kind válido" do
+    t = @user.recurring_transactions.build(description: "X", amount: 1, day_of_month: 1,
+                                           start_date: Date.new(2026, 1, 1))
+
+    assert_not t.valid?
+    assert t.errors.of_kind?(:kind, :inclusion)
+  end
+end

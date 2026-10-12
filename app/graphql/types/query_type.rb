@@ -2,63 +2,107 @@
 
 module Types
   class QueryType < Types::BaseObject
-    field :node, Types::NodeType, null: true, description: "Fetches an object given its ID." do
-      argument :id, ID, required: true, description: "ID of the object."
-    end
-
-    def node(id:)
-      context.schema.object_from_id(id, context)
-    end
-
-    field :nodes, [Types::NodeType, null: true], null: true, description: "Fetches a list of objects given a list of IDs." do
-      argument :ids, [ID], required: true, description: "IDs of the objects."
-    end
-
-    def nodes(ids:)
-      ids.map { |id| context.schema.object_from_id(id, context) }
-    end
-
-    # Add root-level fields here.
-    # They will be entry points for queries on your schema.
+    include Types::Pagination
 
     # Query: Perfil do usuário autenticado
-    # Requer autenticação JWT
     field :me, Types::UserType, null: true, description: "Retorna o perfil do usuário autenticado"
-    
     def me
-      # context[:current_user] foi definido no GraphqlController
       context[:current_user]
     end
 
-    # Query: Listar todos os usuários
-    # Requer autenticação JWT
-    field :users, [Types::UserType], null: false, description: "Lista todos os usuários (requer autenticação)"
-    
-    def users
-      raise GraphQL::ExecutionError, "Você precisa estar autenticado" unless context[:current_user]
-      
-      User.all
-    end
-
-    # Query: Buscar um usuário por ID
-    # Requer autenticação JWT
-    field :user, Types::UserType, null: true, description: "Busca um usuário por ID (requer autenticação)" do
+    # Query: Busca um usuário por ID. Só o próprio usuário pode ser consultado;
+    # não existe listagem de usuários porque ela vazaria e-mails de terceiros.
+    field :user, Types::UserType, null: true, description: "Busca o próprio usuário autenticado por ID" do
       argument :id, ID, required: true
     end
-    
     def user(id:)
-      raise GraphQL::ExecutionError, "Você precisa estar autenticado" unless context[:current_user]
-      
-      User.find(id)
-    rescue ActiveRecord::RecordNotFound
-      raise GraphQL::ExecutionError, "Usuário não encontrado"
+      require_user!
+      raise GraphQL::ExecutionError, "Usuário não encontrado" unless id.to_s == context[:current_user].id.to_s
+
+      context[:current_user]
     end
 
-    # TODO: remove me
-    field :test_field, String, null: false,
-      description: "An example field added by the generator"
-    def test_field
-      "Hello World!"
+    # --- CARTEIRA ---
+    field :wallet, Types::WalletType, null: false, description: "A carteira do usuário autenticado (cada usuário tem uma)"
+    def wallet
+      require_user!
+      context[:current_user].wallet
+    end
+
+    # --- LANÇAMENTOS (RECEITAS E DESPESAS) ---
+    field :transactions, [ Types::TransactionType ], null: false,
+          description: "Lista os lançamentos do usuário autenticado, do mais recente ao mais antigo (paginado)" do
+      argument :kind, Types::TransactionKindEnum, required: false, description: "Só receitas ou só despesas"
+      argument :limit, Integer, required: false, default_value: Types::Pagination::DEFAULT_PAGE_SIZE,
+               description: "Máximo de #{Types::Pagination::MAX_PAGE_SIZE}"
+      argument :offset, Integer, required: false, default_value: 0
+    end
+    def transactions(limit:, offset:, kind: nil)
+      require_user!
+      scope = context[:current_user].transactions.includes(:wallet)
+      scope = scope.where(kind: kind) if kind
+      paginate(scope.order(date: :desc, id: :desc), limit, offset)
+    end
+
+    field :transaction, Types::TransactionType, null: true, description: "Busca um lançamento do usuário autenticado por ID" do
+      argument :id, ID, required: true
+    end
+    def transaction(id:)
+      require_user!
+      context[:current_user].transactions.find(id)
+    rescue ActiveRecord::RecordNotFound
+      raise GraphQL::ExecutionError, "Lançamento não encontrado"
+    end
+
+    # --- RESUMO FINANCEIRO GERAL ---
+    field :total_income, Float, null: false, description: "Soma total de todas as receitas do usuário"
+    def total_income
+      require_user!
+      context[:current_user].transactions.income.sum(:amount).to_f
+    end
+
+    field :total_expense, Float, null: false, description: "Soma total de todas as despesas do usuário"
+    def total_expense
+      require_user!
+      context[:current_user].transactions.expense.sum(:amount).to_f
+    end
+
+    field :balance, Float, null: false, description: "Saldo atual (saldo inicial da carteira + receitas - despesas)"
+    def balance
+      require_user!
+      context[:current_user].wallet.balance
+    end
+
+    # --- LANÇAMENTOS RECORRENTES ---
+    field :recurring_transactions, [ Types::RecurringTransactionType ], null: false,
+          description: "Lista os templates recorrentes do usuário autenticado" do
+      argument :kind, Types::TransactionKindEnum, required: false, description: "Só receitas ou só despesas"
+    end
+    def recurring_transactions(kind: nil)
+      require_user!
+      scope = context[:current_user].recurring_transactions.includes(:wallet)
+      scope = scope.where(kind: kind) if kind
+      scope.order(day_of_month: :asc, id: :asc)
+    end
+
+    field :recurring_transaction, Types::RecurringTransactionType, null: true, description: "Busca um template recorrente do usuário autenticado por ID" do
+      argument :id, ID, required: true
+    end
+    def recurring_transaction(id:)
+      require_user!
+      context[:current_user].recurring_transactions.find(id)
+    rescue ActiveRecord::RecordNotFound
+      raise GraphQL::ExecutionError, "Recorrência não encontrada"
+    end
+
+    private
+
+    def paginate(scope, limit, offset)
+      scope.limit(limit.clamp(1, MAX_PAGE_SIZE)).offset([ offset, 0 ].max)
+    end
+
+    def require_user!
+      raise GraphQL::ExecutionError, "Você precisa estar autenticado" unless context[:current_user]
     end
   end
 end
