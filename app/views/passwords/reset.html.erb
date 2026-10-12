@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova senha - Dashboard Financeiro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <%= stylesheet_link_tag "login" %>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>Nova senha</h1>
+            <p>Escolha uma senha com pelo menos 10 caracteres</p>
+        </div>
+
+        <div id="alertMessage" class="alert-message"></div>
+
+        <form id="resetForm" novalidate>
+            <div class="form-group">
+                <label for="password">Nova senha</label>
+                <div class="input-wrapper">
+                    <input type="password" id="password" name="password" placeholder="Mínimo de 10 caracteres" autocomplete="new-password" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="passwordConfirmation">Confirme a senha</label>
+                <div class="input-wrapper">
+                    <input type="password" id="passwordConfirmation" name="passwordConfirmation" placeholder="Repita a senha" autocomplete="new-password" required>
+                </div>
+            </div>
+
+            <button type="submit" id="btnSubmit" class="btn-login">Salvar nova senha</button>
+        </form>
+
+        <div id="afterReset" class="signup-link is-hidden">
+            <a href="/login">Ir para o login</a>
+        </div>
+
+        <div id="invalidLink" class="signup-link is-hidden">
+            <a href="/password/forgot">Pedir um novo link</a>
+        </div>
+    </div>
+
+    <%= javascript_importmap_tags "reset_password" %>
+</body>
+</html>

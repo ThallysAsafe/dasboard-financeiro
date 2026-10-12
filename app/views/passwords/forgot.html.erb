@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Esqueci a senha - Dashboard Financeiro</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <%= stylesheet_link_tag "login" %>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>Esqueceu a senha?</h1>
+            <p>Informe o e-mail da sua conta e enviaremos um link para escolher uma nova senha</p>
+        </div>
+
+        <div id="alertMessage" class="alert-message"></div>
+
+        <form id="forgotForm" novalidate>
+            <div class="form-group">
+                <label for="email">E-mail</label>
+                <div class="input-wrapper">
+                    <input type="email" id="email" name="email" placeholder="seu@email.com" autocomplete="email" required>
+                </div>
+            </div>
+
+            <button type="submit" id="btnSubmit" class="btn-login">Enviar link</button>
+        </form>
+
+        <div class="divider">
+            <span>ou</span>
+        </div>
+
+        <div class="signup-link">
+            Lembrou a senha? <a href="/login">Entrar</a>
+        </div>
+    </div>
+
+    <%= javascript_importmap_tags "forgot_password" %>
+</body>
+</html>

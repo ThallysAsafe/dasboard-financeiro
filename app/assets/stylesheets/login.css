@@ -224,3 +224,8 @@ body {
     border: 1px solid rgba(34, 197, 94, 0.3);
     color: #86efac;
 }
+
+/* Ponto de partida oculto (sem atributo style inline, que a CSP não permite). */
+.is-hidden {
+    display: none;
+}

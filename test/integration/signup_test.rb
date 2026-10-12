@@ -181,11 +181,11 @@ class SignupTest < ActionDispatch::IntegrationTest
     assert_redirected_to "/dashboard"
   end
 
-  test "o login aponta para o cadastro e não tem mais link morto" do
+  test "o login aponta para o cadastro e para a recuperação de senha, sem links mortos" do
     get "/login"
 
     assert_includes response.body, 'href="/signup"'
+    assert_includes response.body, 'href="/password/forgot"'
     assert_no_match(/href="#"/, response.body)
-    assert_no_match(/Esqueceu/, response.body)
   end
 end

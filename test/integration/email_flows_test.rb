@@ -232,6 +232,24 @@ class EmailFlowsTest < ActionDispatch::IntegrationTest
     assert_not user.reload.email_confirmed?
   end
 
+  test "abrir o link (GET) não confirma: só o POST da página confirma" do
+    token = users(:one).generate_token_for(:email_confirmation)
+
+    get "/email/confirm", params: { token: token }
+
+    assert_response :ok
+    assert_not users(:one).reload.email_confirmed?
+  end
+
+  test "abrir a página de nova senha (GET) não troca a senha" do
+    token = users(:one).generate_token_for(:password_reset)
+
+    get "/password/reset", params: { token: token }
+
+    assert_response :ok
+    assert User.authenticate_with("um@exemplo.com", "123456")
+  end
+
   # --- reenviar a confirmação
 
   test "reenviar exige estar logado" do

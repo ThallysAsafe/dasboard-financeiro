@@ -30,7 +30,8 @@ const ACTIONS = {
     'toggle-recurring': (el) => toggleRecurringActive(el.dataset.kind, el.dataset.id),
     'delete-recurring': (el) => deleteRecurring(el.dataset.kind, el.dataset.id),
     'edit-wallet': () => openWalletModal(),
-    'close-wallet-modal': () => closeWalletModal()
+    'close-wallet-modal': () => closeWalletModal(),
+    'resend-confirmation': () => resendConfirmation()
 };
 
 function bindEvents() {
@@ -55,6 +56,7 @@ async function loadCurrentUser() {
     }
     const data = await response.json();
     document.getElementById('userEmailDisplay').textContent = data.user.email;
+    showConfirmBanner(data.user);
     return true;
 }
 
@@ -642,6 +644,27 @@ function hideModalAlert() {
     const box = document.getElementById('modalAlert');
     box.style.display = 'none';
     box.className = 'alert-message';
+}
+
+// Quem ainda não confirmou o e-mail vê um aviso com o botão de reenviar. Não bloqueia o uso.
+function showConfirmBanner(user) {
+    document.getElementById('confirmBannerEmail').textContent = user.email;
+    document.getElementById('confirmBanner').classList.toggle('is-hidden', user.email_confirmed);
+}
+
+async function resendConfirmation() {
+    const button = document.getElementById('resendConfirmation');
+    button.disabled = true;
+
+    try {
+        const response = await fetch('/api/v1/auth/email/resend', { method: 'POST', headers: AJAX_HEADERS });
+        const data = await response.json();
+        showAlert(response.ok ? 'success' : 'error', data.message || data.error || 'Não foi possível reenviar agora.');
+    } catch (error) {
+        showAlert('error', 'Erro ao conectar ao servidor. Tente novamente.');
+    } finally {
+        button.disabled = false;
+    }
 }
 
 async function handleLogout() {

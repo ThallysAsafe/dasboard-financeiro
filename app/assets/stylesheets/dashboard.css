@@ -603,3 +603,20 @@ select {
 .wallet-actions {
     margin-top: 12px;
 }
+
+.confirm-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 20px;
+    background: rgba(234, 179, 8, 0.12);
+    border-bottom: 1px solid rgba(234, 179, 8, 0.35);
+    color: #fde68a;
+    font-size: 14px;
+}
+
+.confirm-banner.is-hidden {
+    display: none;
+}
