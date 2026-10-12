@@ -7,17 +7,16 @@ class GraphqlLimitsTest < ActiveSupport::TestCase
     query Dashboard($limit: Int!) {
       balance totalIncome totalExpense
       wallets { id name balance totalIncome totalExpense }
-      incomes(limit: $limit) { id description amount date category recurringIncomeId wallet { id name } }
-      expenses(limit: $limit) { id description amount date category recurringExpenseId wallet { id name } }
-      recurringIncomes { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
-      recurringExpenses { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
+      incomes: transactions(kind: INCOME, limit: $limit) { id description amount date category recurringTransactionId wallet { id name } }
+      expenses: transactions(kind: EXPENSE, limit: $limit) { id description amount date category recurringTransactionId wallet { id name } }
+      recurringIncomes: recurringTransactions(kind: INCOME) { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
+      recurringExpenses: recurringTransactions(kind: EXPENSE) { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
     }
   GRAPHQL
 
-  # Os fixtures criam 1 receita/despesa por usuário e bagunçariam as contagens.
+  # Os fixtures criam lançamentos por usuário e bagunçariam as contagens.
   setup do
-    Income.delete_all
-    Expense.delete_all
+    Transaction.delete_all
   end
 
   def execute(query, variables: {}, user: users(:one))
@@ -27,7 +26,7 @@ class GraphqlLimitsTest < ActiveSupport::TestCase
   def seed(user, count, wallet: nil)
     wallet ||= user.wallets.create!(name: "Carteira", initial_balance: 0)
     count.times do |i|
-      user.incomes.create!(description: "Receita #{i}", amount: 10, date: Date.new(2026, 1, 1) + i, wallet: wallet)
+      user.transactions.create!(kind: :income, description: "Receita #{i}", amount: 10, date: Date.new(2026, 1, 1) + i, wallet: wallet)
     end
     wallet
   end
@@ -47,11 +46,11 @@ class GraphqlLimitsTest < ActiveSupport::TestCase
     assert_equal 3, result.dig("data", "incomes").size
   end
 
-  test "query que explora o ciclo wallet -> incomes -> wallet é rejeitada por profundidade" do
+  test "query que explora o ciclo wallet -> transactions -> wallet é rejeitada por profundidade" do
     seed(users(:one), 1)
     nested = "id"
-    6.times { nested = "wallet { incomes { #{nested} } }" }
-    result = execute("{ wallets { incomes { #{nested} } } }")
+    6.times { nested = "wallet { transactions { #{nested} } }" }
+    result = execute("{ wallets { transactions { #{nested} } } }")
 
     assert_match(/depth/i, result["errors"].first["message"])
     assert_nil result["data"]
@@ -63,9 +62,9 @@ class GraphqlLimitsTest < ActiveSupport::TestCase
     assert_nil result["errors"]
   end
 
-  test "incomes devolve no máximo 100 por padrão, da mais recente para a mais antiga" do
+  test "transactions devolve no máximo 100 por padrão, da mais recente para a mais antiga" do
     seed(users(:one), 120)
-    list = execute("{ incomes { date } }").dig("data", "incomes")
+    list = execute("{ transactions(kind: INCOME) { date } }").dig("data", "transactions")
 
     assert_equal 100, list.size
     assert_equal list.map { |i| i["date"] }.sort.reverse, list.map { |i| i["date"] }
@@ -74,9 +73,9 @@ class GraphqlLimitsTest < ActiveSupport::TestCase
 
   test "offset pega a página seguinte sem repetir nem pular itens" do
     seed(users(:one), 12)
-    first = execute("{ incomes(limit: 5) { description } }").dig("data", "incomes")
-    second = execute("{ incomes(limit: 5, offset: 5) { description } }").dig("data", "incomes")
-    third = execute("{ incomes(limit: 5, offset: 10) { description } }").dig("data", "incomes")
+    first = execute("{ transactions(kind: INCOME, limit: 5) { description } }").dig("data", "transactions")
+    second = execute("{ transactions(kind: INCOME, limit: 5, offset: 5) { description } }").dig("data", "transactions")
+    third = execute("{ transactions(kind: INCOME, limit: 5, offset: 10) { description } }").dig("data", "transactions")
 
     all = (first + second + third).map { |i| i["description"] }
     assert_equal 12, all.uniq.size
@@ -86,28 +85,28 @@ class GraphqlLimitsTest < ActiveSupport::TestCase
   test "limit acima do máximo é reduzido para 500 e valores inválidos são saneados" do
     seed(users(:one), 3)
 
-    assert_equal 3, execute("{ incomes(limit: 100000) { id } }").dig("data", "incomes").size
-    assert_equal 1, execute("{ incomes(limit: 0) { id } }").dig("data", "incomes").size
-    assert_equal 3, execute("{ incomes(limit: 10, offset: -5) { id } }").dig("data", "incomes").size
+    assert_equal 3, execute("{ transactions(limit: 100000) { id } }").dig("data", "transactions").size
+    assert_equal 1, execute("{ transactions(limit: 0) { id } }").dig("data", "transactions").size
+    assert_equal 3, execute("{ transactions(limit: 10, offset: -5) { id } }").dig("data", "transactions").size
   end
 
-  test "expenses também é paginada" do
+  test "o filtro por kind também é paginado" do
     user = users(:one)
-    8.times { |i| user.expenses.create!(description: "D#{i}", amount: 5, date: Date.new(2026, 2, 1) + i) }
+    8.times { |i| user.transactions.create!(kind: :expense, description: "D#{i}", amount: 5, date: Date.new(2026, 2, 1) + i) }
 
-    assert_equal 3, execute("{ expenses(limit: 3) { id } }").dig("data", "expenses").size
+    assert_equal 3, execute("{ transactions(kind: EXPENSE, limit: 3) { id } }").dig("data", "transactions").size
   end
 
   test "paginação continua restrita aos dados do próprio usuário" do
     seed(users(:two), 5)
 
-    assert_empty execute("{ incomes { id } }").dig("data", "incomes")
+    assert_empty execute("{ transactions { id } }").dig("data", "transactions")
   end
 
   test "número de SELECTs não cresce com a quantidade de lançamentos (sem N+1)" do
     user = users(:one)
     seed(user, 2)
-    query = "{ incomes { id wallet { id name } user { id email } } }"
+    query = "{ transactions { id wallet { id name } user { id email } } }"
     few = count_selects { execute(query) }
 
     seed(user, 40)

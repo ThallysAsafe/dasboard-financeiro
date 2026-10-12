@@ -2,8 +2,7 @@
 
 module Types
   class QueryType < Types::BaseObject
-    DEFAULT_PAGE_SIZE = 100
-    MAX_PAGE_SIZE = 500
+    include Types::Pagination
 
     # Query: Perfil do usuário autenticado
     field :me, Types::UserType, null: true, description: "Retorna o perfil do usuário autenticado"
@@ -40,57 +39,42 @@ module Types
       raise GraphQL::ExecutionError, "Carteira não encontrada"
     end
 
-    # --- QUERIES DE RECEITAS (INCOMES) ---
-    field :incomes, [ Types::IncomeType ], null: false, description: "Lista as receitas do usuário autenticado, da mais recente para a mais antiga (paginado)" do
-      argument :limit, Integer, required: false, default_value: DEFAULT_PAGE_SIZE, description: "Máximo de #{MAX_PAGE_SIZE}"
+    # --- LANÇAMENTOS (RECEITAS E DESPESAS) ---
+    field :transactions, [ Types::TransactionType ], null: false,
+          description: "Lista os lançamentos do usuário autenticado, do mais recente ao mais antigo (paginado)" do
+      argument :kind, Types::TransactionKindEnum, required: false, description: "Só receitas ou só despesas"
+      argument :limit, Integer, required: false, default_value: Types::Pagination::DEFAULT_PAGE_SIZE,
+               description: "Máximo de #{Types::Pagination::MAX_PAGE_SIZE}"
       argument :offset, Integer, required: false, default_value: 0
     end
-    def incomes(limit:, offset:)
+    def transactions(limit:, offset:, kind: nil)
       require_user!
-      paginate(context[:current_user].incomes.includes(:wallet).order(date: :desc, id: :desc), limit, offset)
+      scope = context[:current_user].transactions.includes(:wallet)
+      scope = scope.where(kind: kind) if kind
+      paginate(scope.order(date: :desc, id: :desc), limit, offset)
     end
 
-    field :income, Types::IncomeType, null: true, description: "Busca uma receita do usuário autenticado por ID" do
+    field :transaction, Types::TransactionType, null: true, description: "Busca um lançamento do usuário autenticado por ID" do
       argument :id, ID, required: true
     end
-    def income(id:)
+    def transaction(id:)
       require_user!
-      context[:current_user].incomes.find(id)
+      context[:current_user].transactions.find(id)
     rescue ActiveRecord::RecordNotFound
-      raise GraphQL::ExecutionError, "Receita não encontrada"
-    end
-
-    # --- QUERIES DE DESPESAS (EXPENSES) ---
-    field :expenses, [ Types::ExpenseType ], null: false, description: "Lista as despesas do usuário autenticado, da mais recente para a mais antiga (paginado)" do
-      argument :limit, Integer, required: false, default_value: DEFAULT_PAGE_SIZE, description: "Máximo de #{MAX_PAGE_SIZE}"
-      argument :offset, Integer, required: false, default_value: 0
-    end
-    def expenses(limit:, offset:)
-      require_user!
-      paginate(context[:current_user].expenses.includes(:wallet).order(date: :desc, id: :desc), limit, offset)
-    end
-
-    field :expense, Types::ExpenseType, null: true, description: "Busca uma despesa do usuário autenticado por ID" do
-      argument :id, ID, required: true
-    end
-    def expense(id:)
-      require_user!
-      context[:current_user].expenses.find(id)
-    rescue ActiveRecord::RecordNotFound
-      raise GraphQL::ExecutionError, "Despesa não encontrada"
+      raise GraphQL::ExecutionError, "Lançamento não encontrado"
     end
 
     # --- RESUMO FINANCEIRO GERAL ---
     field :total_income, Float, null: false, description: "Soma total de todas as receitas do usuário"
     def total_income
       require_user!
-      context[:current_user].incomes.sum(:amount).to_f
+      context[:current_user].transactions.income.sum(:amount).to_f
     end
 
     field :total_expense, Float, null: false, description: "Soma total de todas as despesas do usuário"
     def total_expense
       require_user!
-      context[:current_user].expenses.sum(:amount).to_f
+      context[:current_user].transactions.expense.sum(:amount).to_f
     end
 
     field :balance, Float, null: false, description: "Saldo total geral (Saldo das carteiras + Receitas - Despesas)"
@@ -100,40 +84,30 @@ module Types
       # Somar Wallet#balance deixaria de fora os lançamentos sem carteira, que
       # ainda assim entram em totalIncome/totalExpense e fariam os três cards do
       # dashboard se contradizerem.
-      user.wallets.sum(:initial_balance).to_f + user.incomes.sum(:amount).to_f - user.expenses.sum(:amount).to_f
+      user.wallets.sum(:initial_balance).to_f +
+        user.transactions.income.sum(:amount).to_f - user.transactions.expense.sum(:amount).to_f
     end
 
     # --- LANÇAMENTOS RECORRENTES ---
-    field :recurring_incomes, [ Types::RecurringIncomeType ], null: false, description: "Lista as receitas recorrentes do usuário autenticado"
-    def recurring_incomes
+    field :recurring_transactions, [ Types::RecurringTransactionType ], null: false,
+          description: "Lista os templates recorrentes do usuário autenticado" do
+      argument :kind, Types::TransactionKindEnum, required: false, description: "Só receitas ou só despesas"
+    end
+    def recurring_transactions(kind: nil)
       require_user!
-      context[:current_user].recurring_incomes.includes(:wallet).order(day_of_month: :asc)
+      scope = context[:current_user].recurring_transactions.includes(:wallet)
+      scope = scope.where(kind: kind) if kind
+      scope.order(day_of_month: :asc, id: :asc)
     end
 
-    field :recurring_income, Types::RecurringIncomeType, null: true, description: "Busca uma receita recorrente do usuário autenticado por ID" do
+    field :recurring_transaction, Types::RecurringTransactionType, null: true, description: "Busca um template recorrente do usuário autenticado por ID" do
       argument :id, ID, required: true
     end
-    def recurring_income(id:)
+    def recurring_transaction(id:)
       require_user!
-      context[:current_user].recurring_incomes.find(id)
+      context[:current_user].recurring_transactions.find(id)
     rescue ActiveRecord::RecordNotFound
-      raise GraphQL::ExecutionError, "Receita recorrente não encontrada"
-    end
-
-    field :recurring_expenses, [ Types::RecurringExpenseType ], null: false, description: "Lista as despesas recorrentes do usuário autenticado"
-    def recurring_expenses
-      require_user!
-      context[:current_user].recurring_expenses.includes(:wallet).order(day_of_month: :asc)
-    end
-
-    field :recurring_expense, Types::RecurringExpenseType, null: true, description: "Busca uma despesa recorrente do usuário autenticado por ID" do
-      argument :id, ID, required: true
-    end
-    def recurring_expense(id:)
-      require_user!
-      context[:current_user].recurring_expenses.find(id)
-    rescue ActiveRecord::RecordNotFound
-      raise GraphQL::ExecutionError, "Despesa recorrente não encontrada"
+      raise GraphQL::ExecutionError, "Recorrência não encontrada"
     end
 
     private

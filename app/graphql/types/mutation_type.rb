@@ -13,25 +13,15 @@ module Types
     field :wallet_update, mutation: Mutations::Wallet::WalletUpdate
     field :wallet_delete, mutation: Mutations::Wallet::WalletDelete
 
-    # Mutations de Receita (Income)
-    field :income_create, mutation: Mutations::Income::IncomeCreate
-    field :income_update, mutation: Mutations::Income::IncomeUpdate
-    field :income_delete, mutation: Mutations::Income::IncomeDelete
+    # Mutations de Lançamento (receita ou despesa, conforme `kind`)
+    field :transaction_create, mutation: Mutations::Transaction::TransactionCreate
+    field :transaction_update, mutation: Mutations::Transaction::TransactionUpdate
+    field :transaction_delete, mutation: Mutations::Transaction::TransactionDelete
 
-    # Mutations de Despesa (Expense)
-    field :expense_create, mutation: Mutations::Expense::ExpenseCreate
-    field :expense_update, mutation: Mutations::Expense::ExpenseUpdate
-    field :expense_delete, mutation: Mutations::Expense::ExpenseDelete
-
-    # Mutations de Receita Recorrente
-    field :recurring_income_create, mutation: Mutations::RecurringIncome::RecurringIncomeCreate
-    field :recurring_income_update, mutation: Mutations::RecurringIncome::RecurringIncomeUpdate
-    field :recurring_income_delete, mutation: Mutations::RecurringIncome::RecurringIncomeDelete
-
-    # Mutations de Despesa Recorrente
-    field :recurring_expense_create, mutation: Mutations::RecurringExpense::RecurringExpenseCreate
-    field :recurring_expense_update, mutation: Mutations::RecurringExpense::RecurringExpenseUpdate
-    field :recurring_expense_delete, mutation: Mutations::RecurringExpense::RecurringExpenseDelete
+    # Mutations de Lançamento Recorrente
+    field :recurring_transaction_create, mutation: Mutations::RecurringTransaction::RecurringTransactionCreate
+    field :recurring_transaction_update, mutation: Mutations::RecurringTransaction::RecurringTransactionUpdate
+    field :recurring_transaction_delete, mutation: Mutations::RecurringTransaction::RecurringTransactionDelete
 
     # Geração automática dos lançamentos recorrentes devidos
     field :sync_recurring_entries, mutation: Mutations::Recurring::SyncRecurringEntries

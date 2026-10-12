@@ -35,7 +35,7 @@ CI (`.github/workflows/ci.yml`) runs brakeman, importmap audit, rubocop, and tes
 ### Two APIs, one auth scheme
 
 - **REST (`/api/v1/auth/*`)** — authentication only: `login` (sets the JWT in an HttpOnly cookie), `me`, `logout` (revokes every token of the user). Controller: `app/controllers/api/v1/auth_controller.rb`.
-- **GraphQL (`POST /graphql`)** — everything else: users, wallets, incomes, expenses CRUD plus financial summaries. GraphiQL is mounted at `/graphiql` in development.
+- **GraphQL (`POST /graphql`)** — everything else: users, wallets and transactions (incomes/expenses) CRUD plus financial summaries. GraphiQL is mounted at `/graphiql` in development.
 
 JWT flow: `JsonWebToken` (`app/controllers/concerns/json_web_token.rb`) signs tokens with `secret_key_base` (HS256 pinned on verification), 24h expiry, payload `{ user_id:, tv: }`. `tv` is `users.token_version`: `JsonWebToken.user_for` rejects a token whose `tv` no longer matches, so `User#revoke_tokens!` (logout) and a password change invalidate every token already issued. `user_for` is the single entry point for both consumers:
 
@@ -50,25 +50,27 @@ Brute force: `AuthThrottle` + Rack::Attack limit login (5/min per IP and per e-m
 
 - Schema: `app/graphql/app_schema.rb`; queries in `types/query_type.rb`; mutations registered in `types/mutation_type.rb` and implemented one class per file under `app/graphql/mutations/<resource>/<resource>_<action>.rb` (e.g. `mutations/wallet/wallet_create.rb`).
 - Mutations return `{ resource:, errors: [] }` — validation failures go into `errors` as full messages, not GraphQL errors.
-- Authorization is by scoping: resolvers always go through `context[:current_user].wallets/incomes/expenses`, never `Model.find` directly (except the user queries).
+- Authorization is by scoping: resolvers always go through `context[:current_user].wallets/transactions/recurring_transactions`, never `Model.find` directly (except the user queries).
+- Inside `Mutations::Transaction` / `Mutations::RecurringTransaction` the constants `Transaction` / `RecurringTransaction` resolve to the *module*, not the model — always go through `user.transactions` / `user.recurring_transactions`. Shared mutation helpers (`authenticated_user!`, `find_wallet!`, `with_wallet`) live in `Mutations::Scoped`.
+- List fields paginate with `limit` (default 100, max 500) and `offset` via `Types::Pagination`.
 
 ### Domain model
 
-`User` has many `Wallet`s, `Income`s, `Expense`s. Incomes/expenses belong to a user and optionally to a wallet. `Wallet#balance` = `initial_balance + total_income - total_expense`, but the top-level `balance` query deliberately does **not** sum wallet balances — it computes `wallets.sum(:initial_balance) + incomes.sum - expenses.sum`, so that entries with a null `wallet_id` (which `totalIncome`/`totalExpense` always count) don't make the dashboard's three summary cards contradict each other.
+`User` has many `Wallet`s and `Transaction`s. A `Transaction` is an income or an expense, told apart by the integer enum `kind` (`Transaction::KINDS`, GraphQL enum `TransactionKind`: `INCOME`/`EXPENSE`); `amount` is always positive and the sign comes from `kind`. It belongs to a user and optionally to a wallet. The kind is fixed at creation (`transactionUpdate` has no `kind` argument — reclassifying money means delete + create). Income/expense used to be two parallel tables and class trees; they were merged because the files were line-for-line identical (see migration `UnifyTransactions`). `Wallet#balance` = `initial_balance + total_income - total_expense`, but the top-level `balance` query deliberately does **not** sum wallet balances — it computes `wallets.sum(:initial_balance) + transactions.income.sum - transactions.expense.sum`, so that entries with a null `wallet_id` (which `totalIncome`/`totalExpense` always count) don't make the dashboard's three summary cards contradict each other.
 
 ### Recurrence
 
-`RecurringIncome` and `RecurringExpense` are *templates* (description, amount, `day_of_month`, `start_date`, optional `end_date`, `active`) that materialize real `Income`/`Expense` rows. All the logic lives once in `app/models/concerns/recurring_schedule.rb`; the two models differ only in which association their `entries` method returns.
+`RecurringTransaction` is a *template* (`kind`, description, amount, `day_of_month`, `start_date`, optional `end_date`, `active`) that materializes real `Transaction` rows of the same `kind`; all the logic is in `app/models/recurring_transaction.rb`.
 
 Rules the generator encodes, all load-bearing:
 
 - `day_of_month` is clamped to the month's last valid day — 31 becomes 28/02 (or 29/02 in a leap year).
 - Occurrences are never created with a future date; a template with day 10 produces nothing for the current month until the 10th arrives.
-- Idempotency has two layers: a `last_generated_on` watermark on the template (month-level) and a unique index on `(recurring_*_id, date)` (DB-level backstop). The watermark is what stops an entry the user deliberately deleted from being recreated on the next page load — deriving "already generated" from existing rows would resurrect it.
+- Idempotency has two layers: a `last_generated_on` watermark on the template (month-level) and a unique index on `(recurring_transaction_id, date)` (DB-level backstop). The watermark is what stops an entry the user deliberately deleted from being recreated on the next page load — deriving "already generated" from existing rows would resurrect it.
 - Backfill is floored at `MAX_BACKFILL_MONTHS` (120) counted back from today. The cut is on the window, not the list size: the loop walks oldest→newest, so capping by count would drop the *recent* months.
 - Deleting a template is `dependent: :nullify` — the entries it already generated really happened and stay in the history.
 
-Generation is triggered by the `syncRecurringEntries` mutation (plus implicitly on template create/update), never from a query resolver: the dashboard requests `balance`, `totalIncome`, `incomes` and `expenses` in one document, so a side-effecting query field would run several times per page load and would also fire on any read, including in tests. `DashboardController` cannot trigger it either — it has no `current_user` (see below).
+Generation is triggered by the `syncRecurringEntries` mutation (plus implicitly on template create/update), never from a query resolver: the dashboard requests `balance`, `totalIncome` and the two `transactions` lists in one document, so a side-effecting query field would run several times per page load and would also fire on any read, including in tests. `DashboardController` cannot trigger it either — it has no `current_user` (see below).
 
 ### Frontend
 

@@ -1,11 +1,12 @@
 # frozen_string_literal: true
 
 module Types
-  class RecurringIncomeType < GraphQL::Schema::Object
+  class RecurringTransactionType < GraphQL::Schema::Object
     field :id, ID, null: false
+    field :kind, Types::TransactionKindEnum, null: false
     field :description, String, null: false
     field :amount, Float, null: false
-    field :day_of_month, Integer, null: false, description: "Dia do mês em que a receita entra (travado no último dia em meses curtos)"
+    field :day_of_month, Integer, null: false, description: "Dia do mês em que o lançamento acontece (travado no último dia em meses curtos)"
     field :start_date, GraphQL::Types::ISO8601Date, null: false
     field :end_date, GraphQL::Types::ISO8601Date, null: true, description: "Data final da recorrência; nulo significa sem prazo"
     field :category, String, null: true
@@ -17,8 +18,6 @@ module Types
     field :created_at, GraphQL::Types::ISO8601DateTime, null: false
     field :updated_at, GraphQL::Types::ISO8601DateTime, null: false
 
-    # Todo registro exposto pertence ao usuário autenticado; evita um
-    # SELECT de usuário por linha (N+1).
     def user
       context[:current_user]
     end

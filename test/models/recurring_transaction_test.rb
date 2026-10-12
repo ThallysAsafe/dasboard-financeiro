@@ -1,16 +1,16 @@
 require "test_helper"
 
-# A lógica real vive em RecurringSchedule, compartilhada com RecurringExpense.
-# É aqui que ela é exercitada por inteiro; recurring_expense_test.rb só confere
-# que a concern está ligada do outro lado.
-class RecurringIncomeTest < ActiveSupport::TestCase
+# Regras de agendamento da recorrência (clamp de dia, backfill, idempotência…).
+# Os cenários usam receitas; o kind só importa no teste de despesa no final.
+class RecurringTransactionTest < ActiveSupport::TestCase
   setup do
     @user = users(:one)
     @wallet = wallets(:one)
   end
 
   def template(attrs = {})
-    @user.recurring_incomes.create!({
+    @user.recurring_transactions.create!({
+      kind: :income,
       description: "Salário",
       amount: 5000,
       day_of_month: 5,
@@ -37,7 +37,7 @@ class RecurringIncomeTest < ActiveSupport::TestCase
 
     assert_equal 3, t.generate_entries!(today: Date.new(2026, 3, 31))
     assert_equal 0, t.generate_entries!(today: Date.new(2026, 3, 31))
-    assert_equal 3, t.incomes.count
+    assert_equal 3, t.transactions.count
   end
 
   test "ignora ocorrências anteriores à data de início" do
@@ -66,7 +66,7 @@ class RecurringIncomeTest < ActiveSupport::TestCase
     t = template(active: false, start_date: Date.new(2026, 1, 5))
 
     assert_equal 0, t.generate_entries!(today: Date.new(2026, 6, 5))
-    assert_equal 0, t.incomes.count
+    assert_equal 0, t.transactions.count
   end
 
   test "limita a retroação a exatamente 120 meses, mantendo os mais recentes" do
@@ -75,37 +75,38 @@ class RecurringIncomeTest < ActiveSupport::TestCase
 
     criados = t.generate_entries!(today: hoje)
 
-    assert_equal RecurringSchedule::MAX_BACKFILL_MONTHS, criados
+    assert_equal RecurringTransaction::MAX_BACKFILL_MONTHS, criados
     # Janela fechada de 120 meses: de set/2016 a ago/2026. O corte descarta os
     # meses antigos, nunca os recentes.
-    assert_equal Date.new(2016, 9, 5), t.incomes.minimum(:date)
-    assert_equal Date.new(2026, 8, 5), t.incomes.maximum(:date)
+    assert_equal Date.new(2016, 9, 5), t.transactions.minimum(:date)
+    assert_equal Date.new(2026, 8, 5), t.transactions.maximum(:date)
   end
 
   test "lançamento apagado pelo usuário não é recriado" do
     t = template(day_of_month: 31, start_date: Date.new(2026, 1, 31))
     t.generate_entries!(today: Date.new(2026, 3, 31))
-    t.incomes.order(:date).first.destroy
+    t.transactions.order(:date).first.destroy
 
     assert_equal 0, t.generate_entries!(today: Date.new(2026, 3, 31))
-    assert_equal 2, t.incomes.count
+    assert_equal 2, t.transactions.count
   end
 
   test "apagar o template preserva os lançamentos já gerados" do
     t = template(start_date: Date.new(2026, 1, 5))
     t.generate_entries!(today: Date.new(2026, 3, 5))
-    ids = t.incomes.pluck(:id)
+    ids = t.transactions.pluck(:id)
 
     t.destroy
 
-    assert_equal ids.count, Income.where(id: ids).count
-    assert_equal [ nil ], Income.where(id: ids).pluck(:recurring_income_id).uniq
+    assert_equal ids.count, Transaction.where(id: ids).count
+    assert_equal [ nil ], Transaction.where(id: ids).pluck(:recurring_transaction_id).uniq
   end
 
   test "copia os atributos do template para o lançamento gerado" do
     t = template(start_date: Date.new(2026, 1, 5), category: "Trabalho")
     t.generate_entries!(today: Date.new(2026, 1, 5))
-    income = t.incomes.first
+    income = t.transactions.first
+    assert income.income?
 
     assert_equal "Salário", income.description
     assert_equal 5000, income.amount
@@ -128,7 +129,7 @@ class RecurringIncomeTest < ActiveSupport::TestCase
   end
 
   test "exige end_date igual ou posterior ao início" do
-    invalido = @user.recurring_incomes.build(
+    invalido = @user.recurring_transactions.build(
       description: "X", amount: 10, day_of_month: 5,
       start_date: Date.new(2026, 5, 1), end_date: Date.new(2026, 4, 1)
     )
@@ -138,8 +139,30 @@ class RecurringIncomeTest < ActiveSupport::TestCase
   end
 
   test "valida dia do mês entre 1 e 31" do
-    assert_not @user.recurring_incomes.build(
+    assert_not @user.recurring_transactions.build(
       description: "X", amount: 10, day_of_month: 32, start_date: Date.current
     ).valid?
+  end
+
+  test "template de despesa gera despesas e as preserva ao ser apagado" do
+    t = template(kind: :expense, description: "Aluguel", amount: 1500, day_of_month: 10,
+                 start_date: Date.new(2026, 1, 10))
+
+    assert_equal 3, t.generate_entries!(today: Date.new(2026, 3, 31))
+    assert t.transactions.all?(&:expense?)
+
+    assert_no_difference "Transaction.count" do
+      t.destroy
+    end
+    assert_equal 3, @user.transactions.expense.where(description: "Aluguel").count
+    assert_nil @user.transactions.expense.find_by(description: "Aluguel").recurring_transaction_id
+  end
+
+  test "exige um kind válido" do
+    t = @user.recurring_transactions.build(description: "X", amount: 1, day_of_month: 1,
+                                           start_date: Date.new(2026, 1, 1))
+
+    assert_not t.valid?
+    assert t.errors.of_kind?(:kind, :inclusion)
   end
 end

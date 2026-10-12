@@ -2,7 +2,7 @@ require "test_helper"
 
 class SyncRecurringEntriesJobTest < ActiveJob::TestCase
   def template(user, **attrs)
-    user.recurring_incomes.create!({ description: "Salário", amount: 5000, day_of_month: 5,
+    user.recurring_transactions.create!({ kind: :income, description: "Salário", amount: 5000, day_of_month: 5,
                                      start_date: Date.new(2026, 6, 5) }.merge(attrs))
   end
 
@@ -15,8 +15,8 @@ class SyncRecurringEntriesJobTest < ActiveJob::TestCase
       assert_equal 6, SyncRecurringEntriesJob.perform_now
     end
 
-    assert_equal 3, users(:one).incomes.where.not(recurring_income_id: nil).count
-    assert_equal 3, users(:two).incomes.where.not(recurring_income_id: nil).count
+    assert_equal 3, users(:one).transactions.where.not(recurring_transaction_id: nil).count
+    assert_equal 3, users(:two).transactions.where.not(recurring_transaction_id: nil).count
   end
 
   test "rodar de novo não duplica" do
@@ -24,7 +24,7 @@ class SyncRecurringEntriesJobTest < ActiveJob::TestCase
 
     travel_to Time.zone.local(2026, 8, 9, 12) do
       SyncRecurringEntriesJob.perform_now
-      assert_no_difference "Income.count" do
+      assert_no_difference "Transaction.count" do
         assert_equal 0, SyncRecurringEntriesJob.perform_now
       end
     end
@@ -52,8 +52,8 @@ class SyncRecurringEntriesJobTest < ActiveJob::TestCase
       User.send(:define_method, :sync_recurring_entries!, original)
     end
 
-    assert_equal 0, users(:one).incomes.where.not(recurring_income_id: nil).count
-    assert_equal 3, users(:two).incomes.where.not(recurring_income_id: nil).count
+    assert_equal 0, users(:one).transactions.where.not(recurring_transaction_id: nil).count
+    assert_equal 3, users(:two).transactions.where.not(recurring_transaction_id: nil).count
   end
 
   test "à noite em Brasília ainda é o dia local: não gera a ocorrência do dia seguinte" do

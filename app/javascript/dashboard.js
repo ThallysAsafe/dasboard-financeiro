@@ -4,10 +4,10 @@ const DASHBOARD_QUERY = `
         totalIncome
         totalExpense
         wallets { id name balance totalIncome totalExpense }
-        incomes(limit: $limit) { id description amount date category recurringIncomeId wallet { id name } }
-        expenses(limit: $limit) { id description amount date category recurringExpenseId wallet { id name } }
-        recurringIncomes { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
-        recurringExpenses { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
+        incomes: transactions(kind: INCOME, limit: $limit) { id description amount date category recurringTransactionId wallet { id name } }
+        expenses: transactions(kind: EXPENSE, limit: $limit) { id description amount date category recurringTransactionId wallet { id name } }
+        recurringIncomes: recurringTransactions(kind: INCOME) { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
+        recurringExpenses: recurringTransactions(kind: EXPENSE) { id description amount dayOfMonth startDate endDate category active nextOccurrence wallet { id name } }
     }
 `;
 
@@ -169,7 +169,7 @@ function renderEntries(kind) {
     }
 
     container.innerHTML = entries.map(entry => {
-        const fromRecurrence = isIncome ? entry.recurringIncomeId : entry.recurringExpenseId;
+        const fromRecurrence = entry.recurringTransactionId;
         return `
             <div class="entry-row">
                 <div class="entry-date">${formatDate(entry.date)}</div>
@@ -194,17 +194,18 @@ function renderEntries(kind) {
 
 // Busca a próxima página e anexa à lista; os totais do topo já cobrem tudo.
 async function loadMore(kind) {
-    const isIncome = kind === 'income';
-    const field = isIncome ? 'incomes' : 'expenses';
-    const link = isIncome ? 'recurringIncomeId' : 'recurringExpenseId';
-    const list = isIncome ? state.incomes : state.expenses;
+    const list = kind === 'income' ? state.incomes : state.expenses;
 
     try {
         const data = await graphqlRequest(
-            `query($limit: Int!, $offset: Int!) { ${field}(limit: $limit, offset: $offset) { id description amount date category ${link} wallet { id name } } }`,
-            { limit: PAGE_SIZE, offset: list.length }
+            `query($kind: TransactionKind!, $limit: Int!, $offset: Int!) {
+                transactions(kind: $kind, limit: $limit, offset: $offset) {
+                    id description amount date category recurringTransactionId wallet { id name }
+                }
+            }`,
+            { kind: kind.toUpperCase(), limit: PAGE_SIZE, offset: list.length }
         );
-        const page = data[field] || [];
+        const page = data.transactions || [];
         list.push(...page);
         state.hasMore[kind] = page.length === PAGE_SIZE;
         renderEntries(kind);
@@ -409,6 +410,10 @@ async function handleEntrySubmit(event) {
     if (modalState.mode === 'edit') {
         variables.id = modalState.id;
         args.unshift({ name: 'id', type: 'ID!' });
+    } else {
+        // O tipo só é definido na criação; edição não reclassifica o lançamento.
+        variables.kind = modalState.kind.toUpperCase();
+        args.unshift({ name: 'kind', type: 'TransactionKind!' });
     }
 
     const operation = mutationName();
@@ -440,9 +445,7 @@ async function handleEntrySubmit(event) {
 }
 
 function mutationName() {
-    const base = modalState.recurring
-        ? (modalState.kind === 'income' ? 'recurringIncome' : 'recurringExpense')
-        : (modalState.kind === 'income' ? 'income' : 'expense');
+    const base = modalState.recurring ? 'recurringTransaction' : 'transaction';
     return base + (modalState.mode === 'create' ? 'Create' : 'Update');
 }
 
@@ -458,7 +461,7 @@ async function deleteEntry(kind, id) {
     const entry = entries.find(item => String(item.id) === String(id));
     if (!entry || !confirm(`Excluir "${entry.description}"?`)) return;
 
-    const operation = kind === 'income' ? 'incomeDelete' : 'expenseDelete';
+    const operation = 'transactionDelete';
     await runMutation(
         `mutation($id: ID!) { ${operation}(id: $id) { errors } }`,
         { id },
@@ -477,7 +480,7 @@ async function deleteRecurring(kind, id) {
     );
     if (!confirmed) return;
 
-    const operation = kind === 'income' ? 'recurringIncomeDelete' : 'recurringExpenseDelete';
+    const operation = 'recurringTransactionDelete';
     await runMutation(
         `mutation($id: ID!) { ${operation}(id: $id) { errors } }`,
         { id },
@@ -490,7 +493,7 @@ async function toggleRecurringActive(kind, id) {
     const template = state.recurring.find(item => item.kind === kind && String(item.id) === String(id));
     if (!template) return;
 
-    const operation = kind === 'income' ? 'recurringIncomeUpdate' : 'recurringExpenseUpdate';
+    const operation = 'recurringTransactionUpdate';
     await runMutation(
         `mutation($id: ID!, $active: Boolean) { ${operation}(id: $id, active: $active) { generatedCount errors } }`,
         { id, active: !template.active },

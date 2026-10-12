@@ -1,31 +1,29 @@
-# frozen_string_literal: true
-
-# Lógica compartilhada dos templates de lançamento recorrente.
-#
-# RecurringIncome e RecurringExpense são espelhos exatos um do outro; a única
-# diferença entre eles é qual associação o método `entries` devolve.
-module RecurringSchedule
-  extend ActiveSupport::Concern
-
+# Template de um lançamento que se repete todo mês (salário, aluguel…). Ele não é
+# saldo: materializa lançamentos reais (Transaction) pelo `generate_entries!`.
+class RecurringTransaction < ApplicationRecord
   # Teto de retroação. Protege contra um template com start_date muito antigo
   # tentando materializar centenas de lançamentos de uma vez.
   MAX_BACKFILL_MONTHS = 120
 
-  included do
-    belongs_to :user
-    belongs_to :wallet, optional: true
+  belongs_to :user
+  belongs_to :wallet, optional: true
 
-    validates :description, presence: true
-    validates :amount, presence: true, numericality: { greater_than: 0 }
-    validates :day_of_month, presence: true,
-              numericality: { only_integer: true,
-                              greater_than_or_equal_to: 1,
-                              less_than_or_equal_to: 31 }
-    validates :start_date, presence: true
-    validate :end_date_after_start_date
+  # Nullify e não destroy: os lançamentos já gerados aconteceram de verdade e
+  # continuam valendo para o saldo histórico mesmo sem o template.
+  has_many :transactions, dependent: :nullify
 
-    scope :active, -> { where(active: true) }
-  end
+  enum :kind, Transaction::KINDS, validate: true
+
+  validates :description, presence: true
+  validates :amount, presence: true, numericality: { greater_than: 0 }
+  validates :day_of_month, presence: true,
+            numericality: { only_integer: true,
+                            greater_than_or_equal_to: 1,
+                            less_than_or_equal_to: 31 }
+  validates :start_date, presence: true
+  validate :end_date_after_start_date
+
+  scope :active, -> { where(active: true) }
 
   # Trava `day` no último dia válido do mês da âncora: dia 31 vira 28/02 em 2026,
   # 29/02 em 2028 e 30/04 em qualquer ano.
@@ -50,7 +48,7 @@ module RecurringSchedule
 
     dates = []
     while anchor <= limit.beginning_of_month
-      dates << RecurringSchedule.occurrence_date(anchor, day_of_month)
+      dates << self.class.occurrence_date(anchor, day_of_month)
       anchor = anchor.next_month
     end
 
@@ -64,7 +62,7 @@ module RecurringSchedule
 
     anchor = [ today.beginning_of_month, start_date.beginning_of_month ].max
     3.times do
-      date = RecurringSchedule.occurrence_date(anchor, day_of_month)
+      date = self.class.occurrence_date(anchor, day_of_month)
       return nil if end_date && date > end_date
       return date if date > today && date >= start_date
 
@@ -85,9 +83,10 @@ module RecurringSchedule
       dates = occurrence_dates(today: today)
 
       if dates.any?
-        existing = entries.where(date: dates).pluck(:date)
+        existing = transactions.where(date: dates).pluck(:date)
         (dates - existing).each do |date|
-          entries.create!(
+          transactions.create!(
+            kind: kind,
             user_id: user_id,
             wallet_id: wallet_id,
             description: description,

@@ -3,11 +3,11 @@ require "test_helper"
 class UserTest < ActiveSupport::TestCase
   test "sync_recurring_entries! soma receitas e despesas e é idempotente" do
     user = users(:one)
-    user.recurring_incomes.create!(
-      description: "Salário", amount: 5000, day_of_month: 5, start_date: Date.new(2026, 1, 5)
+    user.recurring_transactions.create!(
+      kind: :income, description: "Salário", amount: 5000, day_of_month: 5, start_date: Date.new(2026, 1, 5)
     )
-    user.recurring_expenses.create!(
-      description: "Aluguel", amount: 1500, day_of_month: 10, start_date: Date.new(2026, 2, 10)
+    user.recurring_transactions.create!(
+      kind: :expense, description: "Aluguel", amount: 1500, day_of_month: 10, start_date: Date.new(2026, 2, 10)
     )
 
     # 3 receitas (jan, fev, mar) + 2 despesas (fev, mar)
@@ -17,8 +17,8 @@ class UserTest < ActiveSupport::TestCase
 
   test "sync_recurring_entries! ignora templates pausados" do
     user = users(:two)
-    user.recurring_incomes.create!(
-      description: "Freela", amount: 800, day_of_month: 1,
+    user.recurring_transactions.create!(
+      kind: :income, description: "Freela", amount: 800, day_of_month: 1,
       start_date: Date.new(2026, 1, 1), active: false
     )
 

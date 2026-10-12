@@ -1,0 +1,31 @@
+income_one:
+  kind: income
+  description: Receita um
+  amount: 9.99
+  date: 2026-07-31
+  category: MyString
+  user: one
+
+expense_one:
+  kind: expense
+  description: Despesa um
+  amount: 9.99
+  date: 2026-07-31
+  category: MyString
+  user: one
+
+income_two:
+  kind: income
+  description: Receita dois
+  amount: 9.99
+  date: 2026-07-31
+  category: MyString
+  user: two
+
+expense_two:
+  kind: expense
+  description: Despesa dois
+  amount: 9.99
+  date: 2026-07-31
+  category: MyString
+  user: two

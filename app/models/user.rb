@@ -2,10 +2,8 @@ class User < ApplicationRecord
   has_secure_password
 
   has_many :wallets, dependent: :destroy
-  has_many :incomes, dependent: :destroy
-  has_many :expenses, dependent: :destroy
-  has_many :recurring_incomes, dependent: :destroy
-  has_many :recurring_expenses, dependent: :destroy
+  has_many :transactions, dependent: :destroy
+  has_many :recurring_transactions, dependent: :destroy
 
   # Normaliza na gravação e também nas buscas (find_by(email:)), então o login
   # não diferencia maiúsculas e a unicidade vale para Ana@x.com e ana@x.com.
@@ -41,8 +39,7 @@ class User < ApplicationRecord
   # Materializa os lançamentos devidos de todos os templates ativos.
   # Devolve quantos lançamentos foram criados no total.
   def sync_recurring_entries!(today: Date.current)
-    recurring_incomes.active.sum { |template| template.generate_entries!(today: today) } +
-      recurring_expenses.active.sum { |template| template.generate_entries!(today: today) }
+    recurring_transactions.active.sum { |template| template.generate_entries!(today: today) }
   end
 
   private
