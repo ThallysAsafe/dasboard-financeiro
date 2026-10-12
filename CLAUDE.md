@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Personal finance dashboard: Rails 7.2 (Ruby 3.4.11, PostgreSQL) serving a GraphQL API for domain data, a small REST API for JWT authentication, and server-rendered HTML pages that consume both APIs from the browser. Comments and user-facing strings are in Portuguese (pt-BR).
+Personal finance dashboard: Rails 8.1 (Ruby 3.4.11, PostgreSQL) serving a GraphQL API for domain data, a small REST API for JWT authentication, and server-rendered HTML pages that consume both APIs from the browser. Comments and user-facing strings are in Portuguese (pt-BR).
 
 ## Development commands
 

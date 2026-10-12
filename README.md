@@ -3,7 +3,7 @@
 Dashboard de finanças pessoais: carteira, receitas, despesas e lançamentos
 recorrentes (salário, aluguel…), com saldo consolidado.
 
-**Stack:** Rails 7.2 · Ruby 3.2.2 · PostgreSQL 15 · GraphQL (graphql-ruby) · JWT.
+**Stack:** Rails 8.1 · Ruby 3.4.11 · PostgreSQL 15 · GraphQL (graphql-ruby) · JWT.
 
 ## Rodando
 

@@ -18,7 +18,7 @@ module App
       current_dataloader_source: -> { GraphQL::Current.dataloader_source_class }
     ]
     # Initialize configuration defaults for originally generated Rails version.
-    config.load_defaults 7.2
+    config.load_defaults 8.1
 
     # Rate limiting de autenticação (config/initializers/rack_attack.rb)
     config.middleware.use Rack::Attack
